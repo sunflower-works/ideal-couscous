@@ -1,0 +1,47 @@
+% Revised 1-level DWT decomposition with intuitive feature hints
+\begin{tikzpicture}[
+    scale=1,
+    band/.style={draw, thick, minimum width=3cm, minimum height=3cm},
+    label/.style={font=\large, anchor=center},
+    sublabel/.style={font=\scriptsize, anchor=north, yshift=-0.15cm},
+    edgefeat/.style={gray, thick}
+]
+    % Title
+    \node[font=\bfseries] at (3,6.7) {1-Level DWT Decomposition};
+
+    % Bands
+    \node[band,label] at (1.5,4.5) (LL) {LL};
+    \node[sublabel] at (LL.south) {(Approximation)};
+
+    \node[band,label] at (4.5,4.5) (LH) {LH};
+    \node[sublabel] at (LH.south) {(Vertical Edges)};
+
+    \node[band,label] at (1.5,1.5) (HL) {HL};
+    \node[sublabel] at (HL.south) {(Horizontal Edges)};
+
+    \node[band,label] at (4.5,1.5) (HH) {HH};
+    \node[sublabel] at (HH.south) {(Diagonal Details)};
+
+    % Feature hints
+    % LL - blurred blob
+    \fill[gray!40, opacity=0.6] (1.5,4.5) circle (0.8cm);
+
+    % LH Vertical lines
+    \foreach \x in {4.1,4.5,4.9} {\draw[edgefeat] (\x,4.0)--(\x,5.0);}
+
+    % HL Horizontal lines
+    \foreach \y in {1.1,1.5,1.9} {\draw[edgefeat] (1.0,\y)--(2.0,\y);}
+
+    % HH Diagonal snippets
+    \draw[edgefeat] (4.1,1.1)--(4.9,1.9);
+    \draw[edgefeat] (4.9,1.1)--(4.3,1.7);
+    \draw[edgefeat] (4.2,1.9)--(5.0,1.3);
+
+    % Annotation box
+    \node[align=left, font=\scriptsize, text width=3.7cm, anchor=west] (ann) at (6.2,3.0) {\textbf{Watermarking Zone:} Embed in the high-frequency detail bands (LH, HL, HH) to balance imperceptibility and robustness.};
+
+    % Arrows
+    \draw[->, dashed, thick] (LH.east) -- (ann.west);
+    \draw[->, dashed, thick] (HL.east) -- (ann.west);
+    \draw[->, dashed, thick] (HH.east) -- (ann.west);
+\end{tikzpicture}
