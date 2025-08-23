@@ -1,0 +1,18 @@
+% Fig 5.1 Extraction accuracy vs JPEG quality (zoomed high-accuracy range)
+\begin{tikzpicture}
+\begin{axis}[
+    width=\linewidth,
+    height=6cm,
+    xlabel={JPEG quality (\%)},
+    ylabel={Accuracy (\%)},
+    ymin=80,ymax=100,
+    xmin=10,xmax=100,
+    ymajorgrids, xmajorgrids,
+    grid style={dashed,gray!30},
+]
+\addplot+[mark=o,thick] coordinates {
+  (10,83)(20,85)(30,88)(40,90)(50,92)(60,94)(70,96)(80,97)(90,98)(100,99)
+};
+\end{axis}
+\end{tikzpicture}
+

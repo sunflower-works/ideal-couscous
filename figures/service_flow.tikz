@@ -1,0 +1,18 @@
+% Fig 3.1 End-to-end service flowchart
+\begin{tikzpicture}[node distance=2.3cm, every node/.style={font=\small}]
+\tikzstyle{srv}=[draw,rounded corners,minimum width=2.6cm,minimum height=1.1cm,fill=white]
+\tikzstyle{msg}=[->,>=latex,thick]
+
+\node[srv] (camera) {Camera node};
+\node[srv, right of=camera] (rover) {Rover CPU};
+\node[srv, right of=rover] (edge)  {Edge gateway};
+\node[srv, right of=edge] (cloud) {University server};
+
+\draw[msg] (camera) -- node[above]{raw frames} (rover);
+\draw[msg] (rover) -- node[above]{MQTT} (edge);
+\draw[msg] (edge) -- node[above]{HTTPS} (cloud);
+
+\draw[dashed,msg] ($(camera.south)+(0,-.5)$) -- ++(9.2,0)
+  node[midway,below]{Monitoring / Metrics};
+\end{tikzpicture}
+

@@ -1,0 +1,14 @@
+% Fig 2.2 One-level DWT decomposition schematic
+\begin{tikzpicture}[font=\small]
+\node[draw,minimum width=2.8cm,minimum height=2cm] (img) {Input image};
+\foreach \y/\lbl in {2/LL,0/LH,-2/HL,-4/HH}{
+  \node[draw,minimum width=2.2cm,minimum height=0.9cm,anchor=west]
+        (b\y) at (4,\y) {\lbl};
+  \draw[->] (img.east) -- ++(0.6,0) |- (b\y.west);
+}
+\node[anchor=west] at (6,2) {low-freq. approx.};
+\node[anchor=west] at (6,0) {horz. detail};
+\node[anchor=west] at (6,-2) {vert. detail};
+\node[anchor=west] at (6,-4) {diag. detail};
+\end{tikzpicture}
+
