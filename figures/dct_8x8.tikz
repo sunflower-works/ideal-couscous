@@ -1,0 +1,32 @@
+% 8x8 DCT block with mid-band region highlighted
+\begin{tikzpicture}[scale=0.55]
+  % Draw grid
+  \foreach \x in {0,...,8} {\draw[gray!60] (\x,0)--(\x,8);}
+  \foreach \y in {0,...,8} {\draw[gray!60] (0,\y)--(8,\y);}
+  % Axis labels
+  \node[anchor=north east,font=\scriptsize] at (0,0) {0};
+  \node[anchor=north west,font=\scriptsize] at (8,0) {u};
+  \node[anchor=south east,font=\scriptsize] at (0,8) {v};
+  % Low-frequency corner annotation
+  \node[anchor=north west,font=\footnotesize] at (0.1,7.9) {DC};
+  % Mid-band mask (diagonal band)
+  \foreach \i in {2,...,5} {
+     \foreach \j in {2,...,5} {
+        \ifnum\i>\j\relax\else
+           \fill[blue!20,opacity=0.6] (\i,\j) rectangle ++(1,1);
+        \fi
+     }}
+  % Legend
+  \draw[fill=blue!20,opacity=0.6] (9,5.5) rectangle ++(0.8,0.8);
+  \node[anchor=west,font=\scriptsize] at (9.9,5.9) {Mid-band coeffs};
+  \node[anchor=west,font=\scriptsize] at (9.0,4.9) {Low freq (robust)};
+  \node[anchor=west,font=\scriptsize] at (9.0,4.1) {High freq (fragile)};
+  % Braces
+  \draw[decorate,decoration={brace,amplitude=4pt}] (0,-0.2) -- (2,-0.2);
+  \node[anchor=north,font=\scriptsize] at (1,-0.6) {Low};
+  \draw[decorate,decoration={brace,amplitude=4pt}] (2,-0.2) -- (6,-0.2);
+  \node[anchor=north,font=\scriptsize] at (4,-0.6) {Mid};
+  \draw[decorate,decoration={brace,amplitude=4pt}] (6,-0.2) -- (8,-0.2);
+  \node[anchor=north,font=\scriptsize] at (7,-0.6) {High};
+\end{tikzpicture}
+
