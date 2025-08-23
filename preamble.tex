@@ -1,0 +1,77 @@
+% =====================  PREAMBLE =====================
+% ---------------------------------------------------------------------
+% Engine guards  ── make sure we’re on LuaLaTeX and load luatex85 shim
+\RequirePackage{ifluatex}
+\ifluatex
+  \RequirePackage{luatex85}         % compatibility shim (older pdf primitives)
+\fi
+% ---------------------------------------------------------------------
+% Encoding & fonts
+\usepackage{fontspec}
+\setmainfont{Libertinus Serif}      % your preferred body font
+\usepackage{unicode-math}
+
+% ---------------------------------------------------------------------
+% Core utilities
+\usepackage[english]{babel}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{array,colortbl}
+\usepackage{tikz}
+\usepackage{tcolorbox}
+\usepackage{listings}
+\usepackage{minted}                 % code snippets (needs --shell-escape)
+\usepackage{glossaries-extra}       % glossaries and acronyms
+\usepackage[backend=biber,
+  style=alphabetic,
+  sorting=nyt]{biblatex}
+\addbibresource{references.bib}
+
+% ---------------------------------------------------------------------
+% Hyperref (ALWAYS last in package block)
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+% ---------------------------------------------------------------------
+% Watermarking ---------------------------------------------------------
+\usepackage[printwatermark]{xwatermark}
+\pdfcompresslevel=0
+\newwatermark[allpages,color=gray!70,scale=0.4]{CONFIDENTIAL DRAFT}
+
+% Visible metadata in PDF properties (also acts as invisible ZWS layer)
+\hypersetup{
+  pdftitle   ={Project Sunflower: A Study in Steganographic Verification},
+  pdfauthor  ={Your Name},
+  pdfsubject ={Digital Watermarking and Distributed Systems},
+  pdfkeywords={steganography, robotics, security, IoT},
+  pdflang    ={en}
+}
+
+% ---------------------------------------------------------------------
+% Zero-width-space watermark helpers (expl3 implementation) ------------
+\ExplSyntaxOn
+\NewDocumentCommand \zws {} { \char_generate:nn { "200B } { 12 } }
+
+\newcounter{wmcount}
+\tl_new:N \g_thewmpages_tl
+
+\NewDocumentCommand \injectZWS { m }
+ {
+  \stepcounter{wmcount}
+  \tl_if_empty:NF \g_thewmpages_tl
+   { \tl_gput_right:Nn \g_thewmpages_tl { ,~ } }
+  \tl_gput_right:Nn \g_thewmpages_tl { \thepage }
+  #1 \zws
+ }
+
+\NewDocumentCommand \thewmpages {} { \tl_use:N \g_thewmpages_tl }
+\ExplSyntaxOff
+
+% ---------------------------------------------------------------------
+% Misc formatting tweaks ----------------------------------------------
+\setlength{\parskip}{0.5em}
+\setlength{\parindent}{0pt}
+
+% ---------------------------------------------------------------------
+% Initialise glossaries ------------------------------------------------
+\makeglossaries
