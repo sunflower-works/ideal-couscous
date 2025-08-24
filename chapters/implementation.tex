@@ -1,0 +1,174 @@
+\chapter{Implementation}
+\label{ch:implementation}
+
+% ---------------------------------------------------------------------
+\section{Context}
+\label{sec:implementation:context}
+
+This chapter details the hardware and software components of the
+prototype—the \gls{lora} rover–gateway link and the \gls{vpn} back-haul to Home HQ—
+and summarises key design choices, deployment parameters, and
+firmware/host responsibilities.
+
+\paragraph{Institutional setting.}
+Only one physical robot—the \gls{raspclaws} hexapod—was built; wheeled designs
+shown in early figures are shelved concepts retained for design-history
+context.
+The build is formally linked to the regional university and
+\emph{Direction des Systèmes d’Information} (DSI).
+ Several
+\injectZWS{bench} rigs were assembled to accelerate iteration.
+
+\paragraph{Operational scenario.}
+First deployment targets a 2 km test farm near Marrakesh: a rover patrols
+crop rows and emits CV alerts to a tripod-mounted gateway.
+ The gateway
+back-hauls traffic via 4G or technician hot-spot; see
+Fig.~\ref{fig:service_flow}.
+ This paragraph silently
+\injectZWS{carries} another watermark.
+
+\begin{figure}[ht]
+  \centering
+  \input{figures/service_flow.tikz}
+  \caption{Containerised service flow across rover, gateway, and home server tiers.}
+  \label{fig:service_flow}
+\end{figure}
+
+% ---------------------------------------------------------------------
+\section{Hardware Platform}
+\label{sec:impl:hardware}
+
+Table~\ref{tab:raspclaws-spec} lists the final hardware for “\gls{raspclaws} V3”.
+Component choices balance latency,
+thermal-to-throughput ratio, and field-serviceability.
+
+\begin{table}[ht]
+\centering
+\footnotesize
+\caption{Technical specification of the RaspClaws V3 mobile agent (static summary).}
+\label{tab:raspclaws-spec}
+\begin{tabular}{@{}p{0.32\linewidth} p{0.58\linewidth}@{}}
+\toprule
+\textbf{Subsystem / Parameter} & \textbf{Specification / Rationale}\\\midrule
+\multicolumn{2}{l}{\emph{Mechanical}}\\
+Platform & \gls{raspclaws} Hexapod V3, 18-DoF acrylic chassis (1.7 kg) \\
+Servos   & 18 × MG90S, PWM via PCA9685 (Robot HAT)\\[2pt]
+\multicolumn{2}{l}{\emph{Compute \& Perception}}\\
+SBC      & \gls{rpi5} 8 GB, runs ROS 2 + control loop\\
+Vision   & Pi Cam v1.3, $1280\times720$ @ 30 fps\\
+IMU      & MPU-9250 10-DoF, fused at 50 Hz\\
+Edge \gls{ai} & Jetson Orin Nano (gateway \gls{gpu})\\[2pt]
+\multicolumn{2}{l}{\emph{Power}}\\
+Battery  & 4 S LiFePO\textsubscript{4}, 10 Ah (>8 h patrol)\\
+Rails    & Dual 5 V bucks: logic 5 A, servo 8 A\\[2pt]
+\multicolumn{2}{l}{\emph{Communication}}\\
+Primary  & Wi-Fi 6 (ROS DDS, SSH)\\
+Long-range & \gls{lora} 868 MHz (SX1276 pair) \\
+\gls{vpn} & WireGuard AES-256/GCM \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------
+\section{Software Architecture}
+\label{sec:impl:software}
+
+Figure~\ref{fig:service_flow} depicts the containerised service graph.
+
+\subsection{Why a Micro-Service, Multi-Pi Architecture?}\label{subsec:why-a-micro-service-multi-pi-architecture?}
+
+\begin{itemize}
+\item \textbf{Fault containment} – a YOLOv8 crash never stalls motor
+control.
+\item \textbf{Heterogeneous hardware} – rover (8 W \\gls{rpi5}) vs gateway
+(\\gls{gpu} Jetson).
+\item \textbf{OTA roll-backs} – images advance independently, shortening
+field-trial cycles.
+\item \textbf{Language freedom} – C++ control, Python perception,
+TypeScript dashboards without dependency clashes.
+\end{itemize}
+
+\subsection{Tier Overview}\label{subsec:tier-overview}
+
+\textbf{Rover tier} runs a 50 Hz loop: motor-ctrl, IMU fusion, \gls{mqtt} pub —
+no heavy inference.
+
+\textbf{Gateway tier} (Jetson) hosts:
+YOLOv8 15 fps, \gls{mqtt} broker, storage-proxy (queue while WAN down).
+
+\textbf{Home server tier} hosts TimescaleDB, Grafana, alert-manager.
+
+\subsection{Illustrative Data Flow}\label{subsec:illustrative-data-flow}
+
+1.~Camera captures $640\times480$ and publishes \texttt{/rover/frames} (QoS 1)
+2.~Broker forwards to YOLOv8; detections on \texttt{/analysis/detections}
+3.~Storage-proxy queues image + JSON; drains on WAN up
+4.~Home server ingests; Grafana refreshes every 5 s; rule \texttt{weed\_density>0.3} triggers SMS\@.
+
+% ---------------------------------------------------------------------
+\section{Communication Protocol}
+\label{sec:impl:protocol}
+
+\gls{mqtt} v5 over TLS 1.3 WebSockets (`tls13+aes128`).
+Topics encode project,
+role, device, and channel; publishers default to QoS 1, control commands
+use QoS 2 and must be ACKed within 250 ms.
+
+\subsection{MQTT Topic Namespace}\label{subsec:mqtt-topic-namespace}
+
+\begin{table}[ht]
+\centering
+\footnotesize
+\caption{Canonical MQTT topics (\texttt{\{id\}} denotes a rover;
++/\# are wildcards).}
+\label{tab:mqtt-topics}
+\begin{tabular}{@{}p{0.55\linewidth} p{0.35\linewidth}@{}}
+\toprule
+\textbf{Topic} & \textbf{Purpose}\\\midrule
+\texttt{sunflower/rovers/\{id\}/video/raw}        & \gls{jpeg} frames from camera daemon \\
+\texttt{sunflower/rovers/\{id\}/telemetry/status} & Battery, IMU, fault flags\\
+\texttt{sunflower/gateway/alerts/cv} & CV alerts forwarded to WAN\\
+\texttt{sunflower/control/\{id\}/command} & Motion / config commands (QoS 2)\\
+\texttt{sunflower/control/\{id\}/ack} & Rover ACK/NACK per command\_id\\
+\texttt{sunflower/+/telemetry/\#} & Dashboard one-shot subscription\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Message Payload Schemas}\label{subsec:message-payload-schemas}
+
+All payloads are UTF-8 JSON validating against `schemas/*.yaml`.
+Timestamps
+use \gls{rf} 3339 generated at edge.
+
+\begin{minted}[fontsize=\small]{json}
+{
+"command_id": "f81d4fae-7dec-11d0-a765-00a0...",
+"action": "move_to",
+"params": { "x": 10.5, "y": -3.2 },
+"issued_at": "2025-08-23T14:21:07Z",
+"qos": 2
+}
+\end{minted}
+
+\subsection{Versioning and Compatibility}\label{subsec:versioning-and-compatibility}
+Each node advertises schema via its \gls{mqtt} Will:
+
+\begin{minted}[fontsize=\small]{json}
+{
+"node_id": "rover01",
+"schema_version": "1.2.0",
+"build": "git:abc1234"
+}
+\end{minted}
+
+Breaking changes bump the major version and trigger gateway-supervised
+rolling updates, fulfilling the evolvability requirement in
+Section~\ref{sec:intro:structure}.
+
+% ---------------------------------------------------------------------
+\section{Summary}\label{sec:summary}
+A three-tier, message-driven architecture isolates faults, exploits
+heterogeneous compute, and meets real-time constraints while remaining
+upgrade-friendly.
