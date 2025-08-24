@@ -1,6 +1,157 @@
-\chapter{Introduction: Self-Demonstrating Cryptographic Research}
-\label{chap:introduction}
+% ----------------- 1 ‑ Introduction -----------------
+\chapter{Introduction}
+\label{ch:intro}
 
-This paragraph looks normal but \injectZWS{contains} a test watermark.
+% Helper (non‑incrementing) display of current watermark total
+\newcommand{\wmTotal}{\textbf{\arabic{wmcount}}}
 
-% …continue drafting here…
+\begin{overview}
+    Digital images and videos circulate at unprecedented speed, demanding
+    reliable authenticity checks.
+    Recent surveys and analyses highlight
+    systemic risks: institutional digital service mandates~\cite{ministereDSI2024},
+    deepfake proliferation eroding trust~\cite{smith2023deepfakes}, and
+    coordinated misinformation campaigns~\cite{doe2024misinfo} amplifying
+    manipulated media.
+    This project explores a
+    \emph{multi-layered steganographic watermark} that embeds cryptographic
+    evidence of provenance while remaining invisible to end users.\footnote{%
+        The techniques described in this thesis can be verified with
+        \texttt{python self\_verify.py}.}
+
+    In fact, this very paragraph \injectZWS{contains} one hidden mark, and
+    there are now \wmTotal\ marks in total.
+\end{overview}
+
+\chapterdivider
+
+\section{Hypothesis and Research Questions}
+\label{sec:intro:hypothesis}
+
+\paragraph{Hypothesis.} The proposed tri-layer (visible cue, metadata, frequency-domain) watermarking pipeline will meet all targets: Robustness: extraction accuracy $\ge 95\%$ after aggressive compression (\gls{jpeg} quality $\le 10\%$, $\approx 90\%$ size reduction) and minor geometric distortion (rotation $\le 5^{\circ}$, resize $\le 10\%$). Latency: embed $\le 250\,\mathrm{ms}$ and extract $\le 300\,\mathrm{ms}$ per frame on the Jetson Orin Nano. Cost: daily on-chain verification fee $<\$0.001$.
+
+\paragraph{Research Questions.}
+\begin{description}[leftmargin=2.1cm,style=sameline]
+  \item[RQ1] Can blind extraction remain $\ge 95\%$ accurate under extreme \gls{jpeg} compression and small geometric noise?
+  \item[RQ2] Can end-to-end (embed+extract) latency stay within 250/300\,ms on constrained edge hardware?
+  \item[RQ3] Can a unified capture\,$\rightarrow$\,edge pipeline integrate watermarking without impairing rover telemetry or gateway duties?
+\end{description}
+
+% -----------------------------------------------------
+\section{Context}
+\label{sec:intro:context}
+
+Before delving into circuitry, firmware, and network stacks, this
+section clarifies the \emph{where}, \emph{why}, and \emph{for whom} of
+the prototype.
+Although the project is incubated in a private–public
+laboratory rather than a profit-driven firm, the surrounding conditions
+still impose very real design constraints.
+
+\paragraph{\textbf{Institutional Setting.}}
+Prototyping is conducted in a small home workshop, yet the project
+remains formally linked to the regional university and the
+\emph{Direction des Systèmes d’Information} (DSI), the public body that
+oversees IT pilots for Moroccan agencies and sponsors the forthcoming
+field trial~\cite{dsi2025,ministereDSI2024}.
+This arrangement combines agility (rapid iteration) with institutional support (test plots, compliance guidance, scale path).
+Because the DSI evaluates rather than purchases the system, long-term maintainability rests with the project
+team and future contributors.
+
+\paragraph{\textbf{Operational Scenario (Planned).}}
+The first planned deployment site is a 2 km-radius test farm managed by
+the DSI on the outskirts of Marrakesh.
+The field currently lacks wired
+connectivity and relies on a small solar shed for power.
+A lightweight
+rover will patrol crop rows and emit computer-vision alerts (e.g.\ weed
+density, moisture anomalies) to a gateway perched on a tripod at the
+field’s edge.\footnote{Throughout this thesis the term \emph{rover}
+refers to the RaspClaws hexapod fitted with a Raspberry Pi 5; earlier
+wheeled prototypes were not fabricated.}%
+\ The gateway back-hauls traffic via opportunistic WAN links (4G USB modem or technician hotspot), motivating: (i) a frequency-domain layer (compression resilience), (ii) a lightweight metadata layer (fast integrity check), and (iii) an optional visible cue (human trust signal) without large bandwidth overhead.
+
+\paragraph{\textbf{Non-Negotiable Constraints.}}
+\begin{description}[leftmargin=3.2cm,style=sameline]
+    \item[\textbf{Budget}] Only off-the-shelf parts (public procurement compliance).
+    \item[\textbf{Man-hours}] Two part-time graduate students; $\le 8$ on-site test days (forces automation).
+    \item[\textbf{Safety}] Cryptographic command auth + physical e-stop (risk mitigation).
+\end{description}
+
+\paragraph{\textbf{Quality Attributes.}}
+\begin{description}[leftmargin=3.2cm,style=sameline]
+    \item[\textbf{Reproducibility}] Full rebuild + dual TTGO flashing $<$1 hour (enables independent validation).
+    \item[\textbf{Traceability}] Logs and \gls{vpn} audits archived one academic year (post-incident analysis + compliance).
+    \item[\textbf{Evolvability}] Swap \gls{lora} spreading factors or inference models with localized changes (future-proofing).
+\end{description}
+
+\bigskip
+The remainder of this chapter shows how the dual-radio \gls{lora} link, the
+laptop-class field gateway, and the IP-level \gls{vpn} collectively satisfy
+these contextual demands.
+
+% -----------------------------------------------------
+\section{Problem Statement}
+\label{sec:intro:problem}
+
+While many watermarking techniques exist, few simultaneously satisfy
+\emph{imperceptibility}, \emph{robustness to common transformations},
+and \emph{real-time performance} on resource-constrained edge devices.
+Concretely, this thesis tackles three gaps:
+
+\begin{description}[leftmargin=3.6cm,style=sameline]
+  \item[\textbf{Robustness bottleneck}] Failures under $\ge 90\%$ JPEG compression or minor geometric distortion (rotation $\le 5^{\circ}$, resize $\le 10\%$).
+  \item[\textbf{Performance gap}] Latency too high for real-time embedded video streams.
+  \item[\textbf{Integration gap}] Lack of end-to-end systems spanning mobile capture \emph{and} edge verification.
+\end{description}
+
+% -----------------------------------------------------
+\section{Objectives}
+\label{sec:intro:objectives}
+
+All objectives are framed as measurable targets:
+
+\begin{description}[leftmargin=3.2cm,style=sameline]
+  \item[O1 Robustness] Blind extraction accuracy $\ge 95\%$ after JPEG quality $\le 10\%$ and minor geometric noise.
+  \item[O2 Latency] Embed $\le 250$\,ms; extract $\le 300$\,ms per frame (Jetson Orin Nano).
+  \item[O3 Integration] Demonstrate rover (Pi 5) capture $\rightarrow$ secure transmission $\rightarrow$ real-time edge verification.
+  \item[O4 Verifiability] Produce a self-demonstrating document embedding the same watermark layers with public verification script.
+\end{description}
+
+% -----------------------------------------------------
+\section{Contributions}
+\label{sec:intro:contributions}
+
+\begin{enumerate}
+  \item[C1] Adaptive tri-layer watermarking scheme (visible, metadata, frequency-domain) (Chapter~\ref{ch:deep_dive}).
+  \item[C2] Real-time distributed edge-\gls{ai} platform (Chapter~\ref{ch:implementation}).
+  \item[C3] Empirical evaluation exceeding robustness + latency targets (Chapter~\ref{ch:exp}).
+  \item[C4] Self-verifying PDF + tooling (Appendix~\ref{app:verify}).
+\end{enumerate}
+
+\noindent\textit{Traceability}: O1$\rightarrow$C3; O2$\rightarrow$C3; O3$\rightarrow$C2; O4$\rightarrow$C4 (enabled by C1).
+
+\begin{roadmapbox}
+\textbf{Section~\ref{sec:intro:problem}} problem framing; \textbf{Section~\ref{sec:intro:objectives}} objectives; \textbf{Chapter~\ref{ch:deep_dive}} background + design; \textbf{Chapter~\ref{ch:implementation}} system build; \textbf{Chapter~\ref{ch:exp}} validation (robustness, latency); \textbf{Chapter~\ref{ch:conclusion}} synthesis and future work.
+\end{roadmapbox}
+
+% -----------------------------------------------------
+\section{Document Structure}
+\label{sec:intro:structure}
+
+Chapter~\ref{ch:deep_dive} surveys the theoretical background and related
+work; Chapter~\ref{ch:implementation} details the hardware and
+software architecture; Chapter~\ref{ch:exp} presents the experimental
+methodology and quantitative results; Chapter~\ref{ch:conclusion}
+summarizes key findings and outlines future research avenues.
+
+As you proceed, remember the principle introduced in the overview: this
+document itself is part of the experiment.
+The invisible watermarking
+layer is active; by the end of this introduction a total of \wmTotal\ marks
+have been embedded.
+The verification script in Appendix~\ref{app:verify} can detect them.
+
+% -----------------------------------------------------
+% End of Introduction
+% -----------------------------------------------------
