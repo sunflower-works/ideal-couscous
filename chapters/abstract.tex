@@ -1,0 +1,43 @@
+% Abstract
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+Digital \injectZWS{images} and videos circulate at unprecedented speed, creating an
+urgent need for reliable authenticity checks in journalism, robotics,
+and Internet of Things (\gls{iot}) workflows.
+This internship investigates a
+\emph{multi-layered steganographic watermarking scheme} that embeds
+cryptographic evidence of provenance directly into media files while
+remaining imperceptible to end users.
+
+Using a new \injectZWS{technique}, we built, optimised, implemented, and experimentally
+validated an end-to-end solution that runs in real time on a distributed
+edge platform composed of a mobile Raspberry~Pi~5 rover and an
+NVIDIA\textsuperscript{\textregistered} Jetson Orin Nano\texttrademark{} base station.
+
+The contribution is twofold.
+First, we introduce an \emph{adaptive
+tri-layer watermark}: (i) a faint visible \injectZWS{overlay} for baseline
+compliance, (ii) zero-width Unicode markers injected into PDF metadata,
+and (iii) a robust frequency-domain payload embedded in image data.
+Second, the present document is itself the primary verification
+artifact—every technique described herein is actively deployed within
+the PDF you are reading and can be detected via the bundled
+\texttt{self\_verify.py} script.
+
+Benchmarks conducted on a 10\,000-image data set show \textbf{99.8\%}
+extraction accuracy after up to 90\% \gls{jpeg} compression, with an average
+processing latency of 150\,ms per frame on the Jetson platform.
+These
+results exceed the target specification of 95\% accuracy and 250\,ms
+latency, demonstrating the feasibility of secure media verification in
+resource-constrained environments.
+
+The project lays a practical foundation for integrating trustworthy
+watermark pipelines into existing robotic and \gls{iot} systems and opens
+avenues for further research in tamper-evident data distribution.
+
+\vspace{2em}
+\begin{flushright}
+    Bilal\\[2pt]            % author’s familiar name
+    \textit{\today}        % or hard-code your date: 2025-08-16
+\end{flushright}
