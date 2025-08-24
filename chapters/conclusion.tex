@@ -1,0 +1,59 @@
+\chapter{Conclusion and Future Work}
+\label{ch:conclusion}
+
+\section*{Key takeaways}
+
+This thesis introduced \textbf{Project Sunflower}, a \emph{self-documenting} watermark
+framework that spans the full stack from frequency-domain embedding to
+block-chain anchoring and field-level verification.
+The work delivered three main contributions:
+
+\begin{enumerate}
+    \item \textbf{Tri-layer watermark design.}
+    A hybrid of zero-width Unicode marks, \gls{dwt}--\gls{svd} frequency embedding, and
+    on-chain digests achieves imper\-ceptibility (\(\text{PSNR}=42.6\,\mathrm{dB}\)),
+    robustness (\(\text{ACC}\ge95\%\) at \gls{jpeg} QF\,=\,70) and auditability.
+    \item \textbf{Edge-ready reference implementation.}
+    The end-to-end pipeline runs in real time on low-power hardware
+    (Raspberry~Pi~5 and Jetson Orin Nano; median latency \(147\pm4\)\,ms) and
+    integrates with ROS and WireGuard for secure telemetry.
+    \item \textbf{Reproducibility tooling.}
+    A \texttt{Makefile}-driven build guards data provenance;
+    the PDF carries its own invisible metadata and ships with an external
+    \textit{self-verification} script, enabling tamper-evident distribution.
+\end{enumerate}
+
+These results collectively satisfy the objectives laid out in
+Section~\ref{sec:intro:objectives}: the system is robust, lightweight,
+and independently verifiable.
+
+\section*{Limitations}
+
+\begin{itemize}
+    \item \textbf{Adversarial coverage.}  Only compression, geometric, and
+    additive-noise attacks were tested; cropping and combined attacks remain
+    unexplored.
+    \item \textbf{Video stream optimisation.}  The current implementation
+    processes still frames; throughput is bounded by per-frame I/O\@.
+    \item \textbf{Informal security model.}  While the scheme is \emph{practically}
+    resilient, a formal proof of indistinguishability is still missing.
+\end{itemize}
+
+\section*{Future research}
+
+\begin{description}[leftmargin=1.8cm]
+    \item[Adversarial robustness] Extend the benchmark suite with cropping,
+    frequency-mix and gradient-based attacks; evaluate defensive fine-tuning.
+    \item[Video-rate pipeline] Fuse watermark embedding with the Jetson’s
+    NVENC/NVDEC stack and exploit Tensor-RT for sub-50\,ms latency.
+    \item[Formal proofs] Model the frequency-domain embedder as a
+    steganographic channel and derive security bounds under adaptive
+    chosen-watermark attacks.
+\end{description}
+
+\bigskip
+\noindent\textit{In closing,} Project Sunflower demonstrates that rigorous
+watermarking can coexist with edge constraints and open-science ideals.
+By releasing both artefacts and verification code, the work invites
+others to replicate, critique, and extend the framework—marking one small
+step toward trustworthy, self-auditing robotics systems.
