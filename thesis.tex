@@ -1,13 +1,17 @@
-\documentclass[12pt,a4paper]{book}
+\documentclass[12pt,a4paper,openright]{book}
+\usepackage{amssymb}
 
 % ---------------------------------------------------------------------
 % PREAMBLE (all packages + custom macros live here) -------------------
 \input{preamble}                 % <— new modular preamble file
 
+%\EnableWatermarkExtended
+%\EnableWatermarkColumns
+%\EnableWatermarkRawMeta
 % ---------------------------------------------------------------------
 % DOCUMENT METADATA ---------------------------------------------------
-\title{Project Sunflower:\\A Framework for Self-Demonstrating\\Cryptographic Research in Distributed Robotic Systems}
-\author{Your Name}
+\title{Project Sunflower:\\A Framework for Self-Documenting\\Cryptographic Research in Distributed Robotic Systems}
+\author{BILAL EL}
 \date{\today}
 
 % =====================================================================
@@ -16,19 +20,26 @@
 \begin{document}
 
     \frontmatter                    % Roman-numbered pages
+    \setcounter{tocdepth}{2}
 
     \maketitle
+
+    \include{chapters/abstract}     % Abstract
+    \include{chapters/acknowledgements} % Acknowledgements
+
     \tableofcontents
     \listoffigures
     \listoftables
 
     \mainmatter                     % Arabic-numbered pages (chapters)
 
-    \include{chapters/introduction} % Chapter 1 (sample)
-
-% \include{chapters/architecture}
-% \include{chapters/implementation}
-% ...
+    \include{chapters/introduction} % Chapter 1
+    \include{chapters/deep_dive}    % Chapter 2
+    \include{chapters/implementation} % Chapter 3
+    \include{chapters/methodology}  % Chapter 4
+    \include{chapters/validation}   % Chapter 5
+    \include{chapters/challenges}   % Chapter 6
+    \include{chapters/conclusion}   % Chapter 7
 
     \backmatter                    % Bibliography / glossaries / appendix
 
@@ -36,25 +47,29 @@
     \printbibliography             % BibLaTeX + biber
 
     \appendix
-    \chapter{Verification Script}
-    The full Python verification listing is shipped alongside this PDF
-    (see \texttt{scripts/self\_verify.py} in the repository).
+    \include{chapters/appendix_dwt_refresher}
+    \include{chapters/appendix_plots}
+    \chapter{Verification Scripts}\label{app:verify}
 
 % ---------------------------------------------------------------------
 % FINAL DISCLOSURE PAGE -----------------------------------------------
-    \AtEndDocument{%
-        \clearpage
-        \begin{center}\section*{Final Watermark Disclosure}\end{center}
-        \vfill
-        \textit{This document contains \textbf{\arabic{wmcount}} invisible
-        watermarks located on pages: \thewmpages.}
-        \vspace{2em}
+\AtEndDocument{%
+    \clearpage
+    \thispagestyle{empty}
+    \begin{center}
+    {\huge\bfseries Victory Lap}\par
+    \vspace{0.8em}
+    {\Large Invisible-Watermark Disclosure}\par
+    \vspace{3em}
+    \begin{tcolorbox}[colback=black!3,colframe=black!70,
+        width=0.85\textwidth,enhanced,sharp corners,
+        fontupper=\large\bfseries]
+        Total marks embedded: \arabic{wmcount}
+    \end{tcolorbox}
+    \vspace{2em}
 
-        \begin{tcolorbox}[colback=black!5,colframe=black!75,
-            title=\centering The Core Thesis,fontupper=\Large\bfseries]
-            The watermarks in this document \textbf{ARE} the research.
-        \end{tcolorbox}
-        \vfill
-    }
+    \emph{Thank you for reading.  Happy verifying!}
+    \end{center}
+}
 
 \end{document}
