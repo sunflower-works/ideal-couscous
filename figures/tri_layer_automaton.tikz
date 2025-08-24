@@ -1,0 +1,92 @@
+% Tri-layer watermarking automaton
+% States encode defence-in-depth progression; aligns with C1 enabling O1/O2/O3.
+\begin{tikzpicture}[
+  scale=1,
+  every node/.style={transform shape},
+  >=Latex,
+  node distance=20mm and 25mm,
+  on grid,
+  auto,
+  every state/.style={draw,rounded corners,align=center,minimum width=17mm,minimum height=10mm,font=\scriptsize},
+  layerBox/.style={draw,thick,rounded corners,inner sep=6pt,fill=gray!5},
+  arrow/.style={->,thick},
+  decision/.style={diamond,aspect=1.4,draw,thick,inner sep=1pt,align=center,font=\scriptsize},
+  annot/.style={font=\scriptsize,align=left}
+]
+
+% Layer grouping boxes
+\node[layerBox,fit={(0,3.3) (6.4,5.2)}] (boxV) {};
+\node[layerBox,fit={(0,1.2) (6.4,3.1)}] (boxM) {};
+\node[layerBox,fit={(0,-1.0) (6.4,1.0)}] (boxF) {};
+
+\node[anchor=west,font=\scriptsize] at (boxV.north west) {Visible Overlay};
+\node[anchor=west,font=\scriptsize] at (boxM.north west) {Metadata Stamp};
+\node[anchor=west,font=\scriptsize] at (boxF.north west) {Frequency Layer};
+
+% States per layer
+\node[state,pattern=north east lines,pattern color=yellow!40,fill=yellow!10] (cap) at (0.9,4.25) {Capture\\Frame};
+\node[state,pattern=north east lines,pattern color=yellow!40,fill=yellow!10,right=of cap] (render) {Render\\Overlay};
+\node[state,pattern=north east lines,pattern color=yellow!40,fill=yellow!10,right=of render] (visdone) {Visible\\Embedded};
+
+\node[state,pattern=dots,pattern color=blue!40,fill=blue!10] (metaStart) at (0.9,2.1) {Assemble\\\gls{payload} $P$};
+\node[state,pattern=dots,pattern color=blue!40,fill=blue!10,right=of metaStart] (sign) {Sign\\HMAC/\\ED25519};
+\node[state,pattern=dots,pattern color=blue!40,fill=blue!10,right=of sign] (inject) {Inject\\XMP};
+
+\node[state,pattern=horizontal lines,pattern color=green!50,fill=green!10] (freqStart) at (0.9,-0.1) {Wavelet\\+ Blocks};
+\node[state,pattern=horizontal lines,pattern color=green!50,fill=green!10,right=of freqStart] (embed) {Keyed\\Modulate};
+\node[state,pattern=horizontal lines,pattern color=green!50,fill=green!10,right=of embed] (stego) {Stego\\Frame $S$};
+
+% Output / verification path
+\node[state,fill=gray!15,below=20mm of stego] (rx) {Received\\$\hat S$};
+\node[state,fill=gray!15,left=of rx] (vcheck) {NCC\\Overlay?};
+\node[state,fill=gray!15,left=of vcheck] (mcheck) {Parse\\XMP};
+\node[state,fill=gray!15,left=of mcheck] (fcheck) {Extract\\Freq Bits};
+
+\node[decision,below=of mcheck] (auth) {All\\Valid?};
+\node[state,fill=red!15,below=8mm of auth,xshift=-16mm,very thick,dashed] (warn) {\xmark\\Degraded};
+\node[state,fill=green!25,below=8mm of auth,xshift=16mm,very thick,double] (accept) {\cmark\\Accepted};
+
+% Arrows (embedding forward)
+\draw[arrow] (cap) -- (render);
+\draw[arrow] (render) -- (visdone);
+
+\draw[arrow] (metaStart) -- (sign);
+\draw[arrow] (sign) -- (inject);
+
+\draw[arrow] (freqStart) -- (embed);
+\draw[arrow] (embed) -- (stego);
+
+% Cross-layer sync arrows (one bent to reduce overlap)
+\draw[arrow,bend left=8] (visdone) to (inject);
+\draw[arrow] (inject) -- (stego);
+
+% Verification path arrows
+\draw[arrow] (stego) -- (rx);
+\draw[arrow] (rx) -- (vcheck);
+\draw[arrow] (vcheck) -- (mcheck);
+\draw[arrow] (mcheck) -- (fcheck);
+\draw[arrow] (fcheck) -- (auth);
+
+% Branches
+\draw[arrow] (auth) -- node[annot,right]{Yes} (accept);
+\draw[arrow] (auth) -- node[annot,left]{Partial / Fallback} (warn);
+
+% Degradation annotations
+\node[annot,align=left] at (5.9,4.95) {O2 latency budget};
+\node[annot,align=left] at (5.9,2.75) {O3 integration};
+\node[annot,align=left] at (5.9,0.55) {O1 robustness};
+
+\node[annot] at (3.2,-1.55) {C1 enables layered defence-in-depth};
+
+% ───────────────────────── Legend ─────────────────────────
+\node[draw,anchor=north,font=\tiny,align=left,fill=white]
+      at ($(current bounding box.south)+(0,-0.35)$)
+      {Legend:\quad%
+        \tikz\draw[fill=yellow!10,pattern=north east lines,pattern color=yellow!40] (0,0) rectangle +(0.3,0.18); \,Visible path\quad
+        \tikz\draw[fill=blue!10,pattern=dots,pattern color=blue!50] (0,0) rectangle +(0.3,0.18); \,Metadata path\quad
+        \tikz\draw[fill=green!10,pattern=horizontal lines,pattern color=green!50] (0,0) rectangle +(0.3,0.18); \,Freq path\quad
+        \tikz\draw[fill=gray!15] (0,0) rectangle +(0.3,0.18); \,Verification\quad
+        $\Diamond$Decision};
+
+\end{tikzpicture}
+\label{fig:tri_layer_automaton}

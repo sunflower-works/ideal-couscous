@@ -5,8 +5,8 @@
   \foreach \y in {0,...,8} {\draw[gray!60] (0,\y)--(8,\y);}
   % Axis labels
   \node[anchor=north east,font=\scriptsize] at (0,0) {0};
-  \node[anchor=north west,font=\scriptsize] at (8,0) {u};
-  \node[anchor=south east,font=\scriptsize] at (0,8) {v};
+  \node[anchor=north west,font=\scriptsize] at (8,0) {$u$};
+  \node[anchor=south east,font=\scriptsize] at (0,8) {$v$};
   % Low-frequency corner annotation
   \node[anchor=north west,font=\footnotesize] at (0.1,7.9) {DC};
   % Mid-band mask (diagonal band)

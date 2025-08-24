@@ -7,7 +7,7 @@
     edgefeat/.style={gray, thick}
 ]
     % Title
-    \node[font=\bfseries] at (3,6.7) {1-Level \gls{DWT} Decomposition};
+    \node[font=\bfseries] at (3,6.7) {1-Level \gls{dwt} Decomposition};
 
     % Bands
     \node[band,label] at (1.5,4.5) (LL) {LL};

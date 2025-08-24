@@ -1,18 +1,70 @@
-% Fig 3.1 End-to-end service flowchart
-\begin{tikzpicture}[node distance=2.3cm, every node/.style={font=\small}]
-\tikzstyle{srv}=[draw,rounded corners,minimum width=2.6cm,minimum height=1.1cm,fill=white]
-\tikzstyle{msg}=[->,>=latex,thick]
+% Detailed end-to-end service flow architecture diagram
+\begin{tikzpicture}[
+  font=\small,
+  node distance=8mm and 12mm,
+  box/.style={draw,rounded corners,fill=black!2,minimum width=38mm,inner sep=6pt,align=center},
+  circ/.style={draw,circle,minimum width=30mm,inner sep=6pt,fill=white,align=center},
+  link/.style={-latex,thick},
+  optlink/.style={link,dashed},
+  label/.style={font=\scriptsize,fill=gray!20,inner sep=1pt},
+]
 
-\node[srv] (camera) {Camera node};
-\node[srv, right of=camera] (rover) {Rover CPU};
-\node[srv, right of=rover] (edge)  {Edge gateway};
-\node[srv, right of=edge] (cloud) {University server};
+% ----- LAN / VPN block ------------------------------------------------
+\node[box,minimum height=80mm](lan){IP / Wi-Fi / Ethernet};
+  \node[circ,above right=of lan.north west,xshift=18mm,yshift=-16mm]         (home){Home Pi\\Central Server};
+  \node[circ,below=22mm of home]                                             (cmd){Portable Pi\\Command Center};
 
-\draw[msg] (camera) -- node[above]{raw frames} (rover);
-\draw[msg] (rover) -- node[above]{MQTT} (edge);
-\draw[msg] (edge) -- node[above]{HTTPS} (cloud);
+  \path[link] (cmd) edge node[label]{\gls{vpn} / SSH} (home);
 
-\draw[dashed,msg] ($(camera.south)+(0,-.5)$) -- ++(9.2,0)
-  node[midway,below]{Monitoring / Metrics};
+% ----- WireGuard pair -------------------------------------------------
+\node[circ,fill=orange!20,right=28mm of cmd] (wgSrv){WireGuard Srv\\10.81.66.1};
+\node[circ,fill=orange!20,below=of wgSrv]    (wgCli){WireGuard Cli\\10.81.66.7};
+\path[link] (wgSrv) edge node[label]{WireGuard tunnel} (wgCli);
+
+\path[link] (cmd) edge[out=0,in=180] node[label]{\gls{mqtt} cmd/rover/} (wgCli);
+\path[link] (cmd) edge[bend right=10] node[label]{\gls{mqtt} alert/rover/} (wgSrv);
+
+% ----- Mobile field centre block -------------------------------------
+\node[box,below=8mm of wgCli,minimum width=55mm,minimum height=45mm] (mob) {MOBILE\\ Command Center};
+  \node[box,fill=white,above=2mm of mob] (laptop)
+        {OpenSUSE Laptop “Pluton”\\[-1pt]• mqtt Edge Relay\\• Dashboard UI\\• Log Capture};
+  \node[box,fill=white,below=2mm of mob] (piZero)
+        {Pi Zero 2 W “$n$-node”\\LoRa HAT};
+
+\path[link] (wgCli) edge node[label]{\gls{mqtt} telemetry/rover/} (mob);
+\path[link] (piZero) edge node[label]{UDP telemetry} (mob);
+\path[link] (piZero) edge[bend left=10] node[label]{UDP 7E \& pkt} (laptop);
+\path[link] (laptop) edge node[label]{USB-ECM 192.168.13.x} (mob);
+
+% ----- LoRa base-station stack ---------------------------------------
+\node[box,below=of mob,minimum height=55mm] (loraBase){LoRa 868 MHz};
+  \node[box,fill=white,above=0 of loraBase] (ttgoUSB){TTGO LoRa32\\USB-UART};
+  \node[box,fill=white,below=0 of loraBase] (ttgoSPI){TTGO LoRa32\\SPI/UART};
+  \path[link] (ttgoUSB) -- (ttgoSPI);
+  \node[label,above left=-1mm of loraBase.north] {USB};
+
+% optional extra antenna
+\node[box,fill=white,right=18mm of loraBase] (roof){TTGO LoRa32\\Roof Antenna};
+\path[optlink] (roof.west) edge[bend left=10] (loraBase);
+
+% ----- Rover block ----------------------------------------------------
+\node[box,left=28mm of loraBase,minimum height=55mm] (rover){Pi Rover};
+  \node[circ,fill=white] at (rover) {Rover Pi};
+\path[link] (rover.east) edge node[label]{UART/SPI} (loraBase.west);
+
+% camera → Pi → Jetson stack
+\node[box,above left=of cmd,xshift=-10mm] (jetson)
+    {Jetson Orin Nano\\• YOLO-v8 Detect\\• Watermark + Sign\\• Publishes alerts → mqtt};
+\path[link] (jetson) edge[bend left=12] (cmd);
+\node[label,midway,sloped,above] at ($(jetson)!0.55!(cmd)$) {\gls{mqtt} alert/rover/};
+
+\node[box,below=14mm of jetson](pi5)
+    {Raspberry Pi 5\\• H.265 Encode\\• RTSP Src};
+\node[label,below=1mm of pi5] (piLab) {RTSP (720p)};
+\path[link] (pi5.south) edge[bend right=20] (cmd.west);
+
+% CSI camera icon
+\node[box,above=of pi5](cam){CSI Camera};
+\path[link] (cam) -- (pi5);
+
 \end{tikzpicture}
-

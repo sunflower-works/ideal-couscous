@@ -1,0 +1,22 @@
+\begin{tikzpicture}[
+    equi/.style={regular polygon,regular polygon sides=3,
+    minimum width=5cm,draw,very thick,rotate=90},
+    lab/.style={font=\small\bfseries},
+    desc/.style={font=\footnotesize,align=center,inner sep=2pt}
+]
+    % equilateral triangle frame
+    \node[equi] (tri) {};
+
+    % vertex labels ---------------------------------------------------
+    \node[lab,anchor=north] at (tri.corner 1) {Capacity};
+    \node[lab,anchor=west ] at (tri.corner 2) {Imperceptibility};
+    \node[lab,anchor=east ] at (tri.corner 3) {Robustness};
+
+    % trade-off annotations (optional) -------------------------------
+    \path (tri.corner 1) -- (tri.corner 2) node[midway,desc,above]
+        {\emph{↑ cap $\Rightarrow$ ↓ impercept.}};
+    \path (tri.corner 2) -- (tri.corner 3) node[midway,desc,right]
+        {\emph{↑ impercept. $\Rightarrow$ ↓ robust}};
+    \path (tri.corner 3) -- (tri.corner 1) node[midway,desc,left]
+        {\emph{↑ robust $\Rightarrow$ ↓ cap}};
+\end{tikzpicture}

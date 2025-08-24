@@ -1,0 +1,22 @@
+% Placeholder anchoring cost plot (replace with real data script output)
+\begin{tikzpicture}
+  \begin{axis}[
+    width=9cm,height=5.2cm,
+    xlabel={Batch size},ylabel={Fee (USD)},
+    ymin=0,ymax=0.003,
+    xmin=16,xmax=256,
+    xtick={16,32,64,128,256},
+    ytick={0,0.001,0.002,0.003},
+    grid=both,
+    title={Anchoring Fee vs Batch Size},
+    legend style={font=\small,at={(0.02,0.98)},anchor=north west}
+  ]
+  % synthetic convex curve (economies to sweet spot then flat)
+  \addplot+[mark=*] coordinates {
+    (16,0.0026)(32,0.0018)(64,0.0012)(96,0.00095)(128,0.00090)(160,0.00092)(192,0.00093)(224,0.00094)(256,0.00095)
+  };
+  \addlegendentry{Estimated fee}
+  \draw[dashed,red] (axis cs:128,0) -- (axis cs:128,0.003) node[above, font=\scriptsize]{sweet spot};
+  \end{axis}
+\end{tikzpicture}
+
