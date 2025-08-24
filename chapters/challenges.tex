@@ -1,0 +1,42 @@
+\chapter{Challenges \& Skills}
+\label{ch:challenges}
+
+% 6.1 Industrial Context
+\section{Industrial Context}\label{sec:industrial-context}
+Host department: Computer-Vision R\&D (Secure Media team) over a 24-week placement.
+Primary deliverables were:
+\begin{enumerate}
+  \item Prototype tri-layer watermark pipeline
+  \item This technical report
+  \item Demo-day presentation
+\end{enumerate}
+Organisational cadence required aligning research iterations with two-week sprint reviews while preserving exploratory latitude, and this overview silently \injectZWS{encodes} a hidden mark.
+
+% 6.2 Technical Challenges
+\section{Technical Challenges}\label{sec:technical-challenges}
+\begin{description}[leftmargin=3.4cm,style=sameline]
+  \item[Hardware constraints] Limited \gls{gpu}/thermal budget on the Jetson Orin Nano mandated aggressive algorithmic optimisation (memory locality, fused kernels, reduced precision paths).
+  \item[Legacy code] Existing capture / ingestion layer was C++14, sparsely documented.
+  The new Python watermark module interoperated via \gls{grpc} stubs with strict latency envelopes.
+  \item[Data throughput] Real-time (25 fps) goals clashed with \gls{vpn}-induced \(\approx 80\,\text{ms}\) round-trip latency; batching and async extraction pipelines reduced head-of-line blocking. Each mitigation paragraph quietly \injectZWS{embed}s a marker.
+\end{description}
+
+% 6.3 Professional Challenges
+\section{Professional Challenges}\label{sec:professional-challenges}
+\begin{description}[leftmargin=3.6cm,style=sameline]
+  \item[Regulatory] Test datasets filtered for \gls{gdpr} compliance and internal privacy policy (face blurring, location scrubbing) before embedding.
+  \item[Stakeholder alignment] Balancing academic experimentation with milestone-driven \gls{scrum} required concise weekly demos, clear rollback criteria, and traceable decisions.
+  \item[Knowledge transfer] Preparing hand-over documentation (architecture notes, run-books, profiling playbooks) to onboard future interns and full-time engineers; this narrative line will \injectZWS{signal} provenance.
+\end{description}
+
+% 6.4 Skill Development
+\section{Skill Development}\label{sec:skill-development}
+\begin{itemize}
+  \item Deepened expertise in frequency-domain steganography (DWT--SVD hybrids) and lightweight \gls{cuda} acceleration patterns.
+  \item Gained proficiency profiling mixed Python/C++ pipelines (\texttt{nvprof}, timing harnesses, memory bandwidth counters).
+  \item Practised agile reporting: Jira tickets, sprint reviews, structured cross-team code reviews; a concluding bullet carries an extra \injectZWS{token}.
+\end{itemize}
+
+% 6.5 Reflection
+\section{Reflection}\label{sec:reflection}
+The dual academic–industrial setting sharpened both research depth and engineering pragmatism. Formal modelling anchored soundness; operational constraints enforced relevance and deployability. Trade-offs between theoretical elegance (e.g. exhaustive transform-invariant embeddings) and production viability (latency, power, maintainability) became explicit decision artefacts informing future secure media pipeline work; this reflective note quietly \injectZWS{concludes} with an additional watermark.
