@@ -1,0 +1,33 @@
+% Glossary & Acronym Entries
+\newacronym{iot}{IoT}{Internet of Things}
+\newacronym{ai}{AI}{Artificial Intelligence}
+\newacronym{dct}{DCT}{Discrete Cosine Transform}
+\newacronym{dwt}{DWT}{Discrete Wavelet Transform. A mathematical technique for decomposing images into frequency sub-bands, used for robust watermark embedding in the LH, HL, and HH detail coefficients}
+\newacronym{psnr}{PSNR}{Peak Signal-to-Noise Ratio}
+\newacronym{ssim}{SSIM}{Structural Similarity Index}
+\newacronym{ber}{BER}{Bit Error Rate}
+\newacronym{cpu}{CPU}{Central Processing Unit}
+\newacronym{gpu}{GPU}{Graphics Processing Unit}
+\newacronym{cnn}{CNN}{Convolutional Neural Network}
+\newacronym{jpeg}{JPEG}{Joint Photographic Experts Group (image compression)}
+\newacronym{hmac}{HMAC}{Hash-based Message Authentication Code}
+\newacronym{lsb}{LSB}{Least Significant Bit}
+\newacronym{steganographictriangle}{Steganographic Triangle}{Fundamental trade-off between capacity (data volume), imperceptibility (visual quality), and robustness (attack resistance) in watermarking schemes}
+\newacronym{ecc}{ECC}{Error-Correcting Code}
+\newacronym{svd}{SVD}{Singular Value Decomposition}
+\newacronym{rf}{RF}{Radio Frequency}
+\newacronym{mqtt}{MQTT}{Message Queuing Telemetry Transport. Lightweight publish-subscribe messaging protocol used for telemetry data exchange between system components}
+\newacronym{rpi5}{RPI5}{Single-board computer on RaspClaws for locomotion, sensing, and vision processing}
+\newacronym{vpn}{VPN}{Encrypted WireGuard tunnel providing secure communication between field gateway and Home HQ over public infrastructure}
+\newacronym{lora}{LoRa}{Long Range 868 MHz ISM-band low-power radio providing rover-to-gateway wide-area connectivity}
+\newacronym{rover}{ROVER}{Refers exclusively to the RaspClaws hexapod fitted with a Raspberry Pi 5 (no wheeled concepts were fabricated)}
+\newacronym{cuda}{CUDA}{NVIDIA Compute Unified Device Architecture parallel compute platform}
+\newacronym{gdpr}{GDPR}{General Data Protection Regulation governing personal data protection in the EU}
+\newacronym{grpc}{gRPC}{High-performance Remote Procedure Call framework used for inter-process/service communication}
+\newacronym{scrum}{Scrum}{Agile framework for iterative, incremental product development}
+
+% New non-acronym glossary entries
+\newglossaryentry{homehq}{name={Home HQ},description={University-based server infrastructure that receives telemetry and issues commands via the VPN tunnel}}
+\newglossaryentry{raspclaws}{name={RaspClaws},description={Physical hexapod robot platform: six legs, 18 servo motors (3 per leg) providing 3 DOF articulation per limb}}
+\newglossaryentry{payload}{name={Payload},description={Secret data to be hidden within a cover medium (denoted $P$); here typically cryptographic HMAC values encoding provenance information}}
+\newglossaryentry{raspberrypi5}{name={Raspberry Pi 5},description={Single-board computer mounted on RaspClaws acting as primary control unit for locomotion, sensing, and vision processing}}
