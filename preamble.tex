@@ -58,6 +58,10 @@
 
 % =====================  WATERMARK MACROS (expl3) =====================
 \ExplSyntaxOn
+% New: output stream for watermark index
+\iow_new:N \g_wm_index_iow
+\AtBeginDocument{\iow_open:Nn \g_wm_index_iow { \jobname.wmidx }}
+\AtEndDocument{\iow_close:N \g_wm_index_iow }
 \NewDocumentCommand \zws {} { \char_generate:nn { "200B } { 12 } }
 \newcounter{wmcount}
 \tl_new:N \g_thewmpages_tl
@@ -153,6 +157,8 @@
     \bool_if:NF \g_wm_store_columns_bool { \tl_put_right:Nn \l_tmpa_tl { -- } }
     \prop_gput:NnV \g_wm_meta_prop { \int_use:c { c@wmcount } } { \l_tmpa_tl }
   }
+  % Write index line: WM|<seq>|page=<p>|line=<line>|col=<col or ->
+  \iow_now:Nx \g_wm_index_iow { WM|\int_use:c { c@wmcount }|page=\l_tmpb_tl|line=\the\inputlineno|col=\bool_if:NTF \g_wm_store_columns_bool {\fp_eval:n { round( ( (\dim_eval:n{\pdflastxpos sp}) / (1em) ), 2 ) }}{--} }
   #1 \zws
 }
 \ExplSyntaxOff
