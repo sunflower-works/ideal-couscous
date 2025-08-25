@@ -35,9 +35,14 @@ verify: build
 	python3 $(VERIFY) $(OUTPDF)
 	@echo "--- Verification Complete ---"
 
+mosaic: build
+	@echo "--- Generating thumbnail mosaic with watermark marks ---"
+	python3 scripts/mosaic_mark.py --paper a2paper --out thesis_mosaic_marked_a2.pdf || { echo 'Hint: pip install reportlab'; exit 1; }
+	@echo "--- Mosaic ready: thesis_mosaic_marked_a2.pdf ---"
+
 clean:
 	@echo "--- Cleaning build artefacts ---"
 	latexmk -C
 	rm -f $(OUTPDF) thesis.gls thesis.glg thesis.bbl-SAVE-ERROR thesis.bcf-SAVE-ERROR
 
-.PHONY: all build watch verify clean analyze final
+.PHONY: all build watch verify clean analyze final mosaic
