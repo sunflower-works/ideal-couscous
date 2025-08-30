@@ -1,0 +1,153 @@
+.ONESHELL:  # All commands in a recipe run in the same shell
+SHELL := /bin/bash
+
+# Default variables
+EDGE_ROOT ?= $(HOME)/edge-yolo
+IMG_SIZE ?= 640
+CALIB_COUNT ?= 256
+CALIB_SAMPLES ?= $(CALIB_COUNT)
+CALIB_SUBSETS ?= val2017
+CALIB_BATCH ?= 8
+MAP ?= 1
+INT8_LAYER ?= 1
+COCO_SUBSETS ?= val2017 annotations
+PRECISIONS ?= fp32 fp16 int8
+COCO_SIZE_TOL ?= 6
+COCO_ALLOW_LARGER ?= 1
+COCO_EXTRA ?=
+
+# Writable COCO root detection
+COCO_CANDIDATES := $(HOME)/coco $(HOME)/data/coco /data/coco
+COCO_ROOT ?= $(shell for d in $(COCO_CANDIDATES); do mkdir -p $$d >/dev/null 2>&1 && test -w $$d && echo $$d && break; done)
+
+ifeq ($(strip $(COCO_ROOT)),)
+$(warning No writable COCO root found; set COCO_ROOT explicitly.)
+COCO_ROOT := $(HOME)/coco
+endif
+
+VENV := $(EDGE_ROOT)/.venv
+PY := $(VENV)/bin/python
+ACTIVATE := source $(VENV)/bin/activate
+SCRIPTS_DIR := $(CURDIR)/edge_yolo_scripts
+
+# Helper to ensure venv python
+define ensure_venv
+	if [ ! -x $(PY) ]; then
+		echo "[i] Python venv missing; run 'make env' first"
+		exit 2
+	fi
+endef
+
+.PHONY: env coco-download calib-subset batch consolidate latency-table precision-diff report all clean-engines
+
+env:
+	echo "[i] Setting up edge venv in $(EDGE_ROOT)"
+	mkdir -p $(EDGE_ROOT)
+	cd $(EDGE_ROOT)
+	python3 -m venv .venv
+	$(ACTIVATE)
+	python -m pip install --upgrade pip wheel setuptools
+	pip install ultralytics onnx onnxsim numpy opencv-python tqdm rich
+	echo "[i] venv ready"
+
+coco-download:
+	echo "[i] COCO root: $(COCO_ROOT)  subsets: $(COCO_SUBSETS) tol=$(COCO_SIZE_TOL)% allow_larger=$(COCO_ALLOW_LARGER)"
+	mkdir -p $(COCO_ROOT)
+	$(PY) $(SCRIPTS_DIR)/download_coco.py --output-dir $(COCO_ROOT) --subsets $(COCO_SUBSETS) \
+		--size-tolerance-pct $(COCO_SIZE_TOL) $(if $(filter 1,$(COCO_ALLOW_LARGER)),--allow-larger,) $(COCO_EXTRA)
+
+calib-subset:
+	$(call ensure_venv)
+	echo "[i] Building calib subset -> $(EDGE_ROOT)/calib_images (N=$(CALIB_COUNT)) (auto-extract)"
+	cd $(EDGE_ROOT)
+	$(PY) $(SCRIPTS_DIR)/make_calib_subset.py --coco-root $(COCO_ROOT) --subsets $(CALIB_SUBSETS) \
+		--count $(CALIB_COUNT) --out-dir calib_images --deterministic --auto-extract
+
+batch:
+	$(call ensure_venv)
+	echo "[i] Batch precisions: $(PRECISIONS)  IMG_SIZE=$(IMG_SIZE)"
+	cd $(EDGE_ROOT)
+	PRECISION=fp32 true
+	EXTRA_PRECS="$(PRECISIONS)" CALIB_DIR="$(EDGE_ROOT)/calib_images" CALIB_SAMPLES=$(CALIB_SAMPLES) \
+	INT8_LAYER_REPORT=$(INT8_LAYER) MAP_EVAL=$(MAP) MAP_DATA=coco128.yaml \
+	bash $(SCRIPTS_DIR)/11_jetson_batch_precisions.sh $(EDGE_ROOT) $(IMG_SIZE)
+
+consolidate:
+	$(call ensure_venv)
+	echo "[i] Consolidating edge inference report"
+	cd $(EDGE_ROOT)
+	# Generic consolidated outputs (kept for backward compatibility)
+	$(PY) $(SCRIPTS_DIR)/consolidate_edge_report.py --latency-csv latency_comparative_$(IMG_SIZE).csv \
+		--map-glob "map_metrics_$(IMG_SIZE)_*.json" --int8-layers int8_layers_$(IMG_SIZE).json \
+		--device "Jetson Orin Nano" --imgsz $(IMG_SIZE) \
+		--out-tex results/figures/edge_inference_report.tex \
+		--out-json results/figures/edge_inference_report.json
+	# Jetson-specific named outputs for chapter auto-include
+	$(PY) $(SCRIPTS_DIR)/consolidate_edge_report.py --latency-csv latency_comparative_$(IMG_SIZE).csv \
+		--map-glob "map_metrics_$(IMG_SIZE)_*.json" --int8-layers int8_layers_$(IMG_SIZE).json \
+		--device "Jetson Orin Nano" --imgsz $(IMG_SIZE) \
+		--caption "YOLOv8n Edge Inference Summary (Jetson, $(IMG_SIZE)px)" \
+		--label tab:edge_infer_jetson_$(IMG_SIZE) \
+		--out-tex results/figures/edge_inference_report_jetson_$(IMG_SIZE).tex \
+		--out-json results/figures/edge_inference_report_jetson_$(IMG_SIZE).json
+
+latency-table:
+	$(call ensure_venv)
+	cd $(EDGE_ROOT)
+	$(PY) $(SCRIPTS_DIR)/generate_latency_table.py --csv latency_comparative_$(IMG_SIZE).csv \
+		--out results/figures/latency_table_generated.tex \
+		--caption "YOLOv8n Latency ($(IMG_SIZE))" --label tab:lat_$(IMG_SIZE)
+
+precision-diff:
+	$(call ensure_venv)
+	cd $(EDGE_ROOT)
+	$(PY) $(SCRIPTS_DIR)/generate_precision_diff.py --latency-csv latency_comparative_$(IMG_SIZE).csv \
+		--map-glob "map_metrics_$(IMG_SIZE)_*.json" --imgsz $(IMG_SIZE) \
+		--out-tex results/figures/precision_diff_summary.tex \
+		--out-json results/figures/precision_diff_summary.json || true
+
+report: consolidate latency-table precision-diff
+	echo "[i] Report artefacts generated under $(EDGE_ROOT)/results/figures"
+
+clean-engines:
+	echo "[i] Removing cached TensorRT engines"
+	rm -f $(EDGE_ROOT)/yolov8n_*_fp32.engine $(EDGE_ROOT)/yolov8n_*_fp16.engine $(EDGE_ROOT)/yolov8n_*_int8.engine || true
+
+# Additional maintenance / reset targets
+
+# Extract already-downloaded COCO archives without re-downloading (handles each subset zip if present)
+coco-extract:
+	@echo "[i] Extracting COCO zips for subsets=$(COCO_SUBSETS) from $(COCO_ROOT)"
+	@set -e; for s in $(COCO_SUBSETS); do \
+	  z1="$(COCO_ROOT)/$${s}.zip"; z2="$(COCO_ROOT)/downloads/$${s}.zip"; \
+	  if [ -f "$$z1" ]; then echo "[i] Unzipping $$z1"; unzip -n -q "$$z1" -d "$(COCO_ROOT)"; \
+	  elif [ -f "$$z2" ]; then echo "[i] Unzipping $$z2"; unzip -n -q "$$z2" -d "$(COCO_ROOT)"; \
+	  else echo "[w] Zip for subset $$s not found (looked at $$z1 and $$z2)"; fi; \
+	done; echo "[i] Extraction complete"
+
+# Remove engines, calibration subset, latency / map / layer coverage artifacts (keeps venv & dataset)
+reset-edge:
+	@echo "[i] Resetting edge artifacts under $(EDGE_ROOT) (keeping dataset & venv)"
+	@rm -rf $(EDGE_ROOT)/calib_images || true
+	@rm -f $(EDGE_ROOT)/yolov8n_*_fp32.engine $(EDGE_ROOT)/yolov8n_*_fp16.engine $(EDGE_ROOT)/yolov8n_*_int8.engine || true
+	@rm -f $(EDGE_ROOT)/detector_latency_jetson_*_*.json || true
+	@rm -f $(EDGE_ROOT)/latency_comparative_*.csv || true
+	@rm -f $(EDGE_ROOT)/map_metrics_*_*.json || true
+	@rm -f $(EDGE_ROOT)/int8_layers_*.json || true
+	@rm -rf $(EDGE_ROOT)/results/figures || true
+	@echo "[i] Edge artifacts cleared"
+
+# Full clean: everything (ENGINES, venv, results) EXCEPT COCO dataset unless FULL_DATA=1
+FULL_DATA ?= 0
+full-clean:
+	@echo "[i] Full clean (EDGE_ROOT=$(EDGE_ROOT)) preserve COCO dataset (FULL_DATA=$(FULL_DATA))"
+	@rm -rf $(EDGE_ROOT)/yolov8n_*_*.engine $(EDGE_ROOT)/calib_images $(EDGE_ROOT)/results || true
+	@rm -rf $(EDGE_ROOT)/detector_latency_jetson_*_*.json $(EDGE_ROOT)/latency_comparative_*.csv $(EDGE_ROOT)/map_metrics_*_*.json $(EDGE_ROOT)/int8_layers_*.json || true
+	@if [ -d $(EDGE_ROOT)/.venv ]; then rm -rf $(EDGE_ROOT)/.venv; fi
+	@if [ "$(FULL_DATA)" = "1" ]; then echo "[i] Removing COCO dataset at $(COCO_ROOT)"; rm -rf $(COCO_ROOT); fi
+	@echo "[i] Full clean complete"
+
+.PHONY += coco-extract reset-edge full-clean
+
+all: env coco-download calib-subset batch report
+	echo "[i] Full pipeline complete"
