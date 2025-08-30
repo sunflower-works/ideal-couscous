@@ -1,0 +1,20 @@
+% Appendix: Reproducibility / Full Bill of Materials
+\chapter{Full Bill of Materials and Reproducibility Notes}\label{ch:repro_bom}
+
+This appendix provides the exhaustive Bill of Materials (BOM) for the
+prototype platform.
+The main text presents only a concise summary
+(Table~\ref{tab:raspclaws-spec}) to reduce cognitive load; here every
+considered line item is retained (accepted, rejected, or pending) for
+audit and replication.
+
+\begin{itemize}
+  \item Column “Final” marks whether the part is present in the fabricated build (\BOMYes) or a discarded / deferred alternative (\BOMNo).
+  \item Unit prices are indicative and may drift; regenerate prior to procurement with: \texttt{make bom}.
+  \item Formatting quirks (e.g., power ranges, scanning angles) are normalised automatically by \texttt{scripts/generate_bom\_tables.py}.
+  \item The authoritative editable source lives in the CSV: \texttt{toolset/csv(BOM).csv}.
+\end{itemize}
+
+% Auto-generated full BOM table
+\IfFileExists{toolset/bom_full_generated.tex}{\input{toolset/bom_full_generated}}{\textbf{Missing generated BOM file. Run `make bom`.}}
+
