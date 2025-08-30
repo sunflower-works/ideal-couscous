@@ -11,9 +11,12 @@ cd "$ROOT"
 # System deps (best-effort). Skip if sudo unavailable.
 if command -v apt-get >/dev/null 2>&1; then
   if command -v sudo >/dev/null 2>&1; then
-    sudo apt-get update -y && sudo apt-get install -y python3-venv python3-pip git pkg-config || echo "[w] apt-get partial failure (continuing)"
+    echo "[i] Installing system packages (python venv, build tools, cmake, ninja)"
+    sudo apt-get update -y && \
+    sudo apt-get install -y python3-venv python3-pip git pkg-config build-essential cmake ninja-build || \
+      { echo "[e] apt-get failed"; exit 1; }
   else
-    echo "[w] sudo not present; skipping apt-get install"
+    echo "[w] sudo not present; skipping apt-get install (ensure build-essential & cmake exist)"
   fi
 fi
 # Venv
@@ -21,6 +24,5 @@ $PY -m venv .venv
 # shellcheck disable=SC1091
 source .venv/bin/activate
 python -m pip install --upgrade pip wheel setuptools
-pip install ultralytics onnx onnxsim numpy opencv-python tqdm rich
-echo "[i] Common environment ready at $ROOT/.venv"
-
+# Install all required Python deps (fail fast if something missing)
+pip install ultralytics onnx onnxsim numpy opencv-python tqdm rich || { echo "[e] Python dependency install failed"; exit 1; }
