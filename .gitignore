@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.so
+.venv/
+.env
+
+# IDE/editor
+.vscode/
+.idea/
+*.iml
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.out
+*.synctex(busy)
+*.synctex.gz
+*.toc
+*.glg
+*.glo
+*.gls
+*.ist
+*.wmidx
+*.xwm
+_minted/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Generated results/artifacts (adjust if you want them tracked)
+results/
+
+# Tool-generated figures
+toolset/figures/*_generated*
+
+# OS
+.DS_Store
+Thumbs.db

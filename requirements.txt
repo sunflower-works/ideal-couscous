@@ -1,0 +1,24 @@
+# Edge YOLO benchmarking - pinned Python dependencies
+# These are the packages this repo imports directly. Versions match your working venv.
+
+ultralytics==8.3.189
+onnx==1.19.0
+onnxsim==0.4.36
+onnxruntime==1.22.1
+numpy==2.2.6
+opencv-python==4.12.0.88
+PyYAML==6.0.2
+tqdm==4.67.1
+rich==14.1.0
+
+# Export/runtime support
+torch==2.8.0
+torchvision==0.23.0
+
+# Optional: OpenVINO CPU backend (used by ov-cpu target)
+openvino==2025.2.0
+
+# Jetson system-provided (do not pip install; venv has --system-site-packages):
+# - tensorrt  (install via apt: python3-libnvinfer python3-libnvinfer-dev)
+# - pycuda    (install via apt: python3-pycuda)
+# Once those two are present, the benchmark will use the pycuda path instead of trtexec fallback.

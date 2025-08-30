@@ -1,0 +1,11 @@
+# schema: benchmark export v1
+run_uuid,timestamp,git_commit,algorithm,round_idx,status,fail_reason,payload_bits_requested,payload_bits_embedded,payload_bits_recovered,payload_hash,payload_fmt_version,ber_percent,ber_bits_wrong,bits_total,success_flag,psnr_db,ssim,embed_ms,extract_ms,cpu_pct_mean,cpu_pct_max,rss_max_mib,watermark_strength,robustness_score,image_id,image_category,image_blur_metric,anchoring_fee_usd,digest_bytes,tx_confirm_s,gpu_flag,algo_variant,blockchain
+ed6b5bed7511,1756220861,deadbeef,dct_parity,0,ok,,64,64,64,,v1,0.99,0,64,1,,,153.84,174.60,31.51,48.34,325.7,0.806,0.9901,test_0000,val2017,13273.4160,0.0037,32,2.92,1,dct_parity,polygon-mumbai
+daf3e2662185,1756220861,deadbeef,dwt_svd,1,ok,,64,64,64,,v1,0.86,0,64,1,,,165.58,139.44,36.32,60.87,332.2,0.765,0.9914,test_0000,val2017,13273.4160,0.0014,32,3.19,1,dwt_svd,polygon-mumbai
+184dbee2c49c,1756220861,deadbeef,dwt_svd_adv,2,ok,,64,64,64,,v1,0.90,0,64,1,,,139.91,134.87,23.63,40.99,369.4,0.782,0.9910,test_0000,val2017,13273.4160,0.0013,32,2.13,1,dwt_svd_adv,polygon-mumbai
+cfad63d7526a,1756220861,deadbeef,dct_parity,3,ok,,64,64,64,,v1,0.91,0,64,1,,,164.13,180.02,31.33,62.31,385.1,0.826,0.9909,test_0001,val2017,12719.5615,0.0017,32,1.88,1,dct_parity,polygon-mumbai
+9bacf418b04e,1756220861,deadbeef,dwt_svd,4,ok,,64,64,64,,v1,1.11,0,64,1,,,157.33,173.33,36.71,76.23,407.8,0.756,0.9889,test_0001,val2017,12719.5615,0.0019,32,2.86,1,dwt_svd,polygon-mumbai
+a548b95e3f52,1756220861,deadbeef,dwt_svd_adv,5,ok,,64,64,64,,v1,1.46,0,64,1,,,144.85,176.29,32.86,73.98,316.1,0.802,0.9854,test_0001,val2017,12719.5615,0.0025,32,2.05,1,dwt_svd_adv,polygon-mumbai
+93cd83bc9d82,1756220861,deadbeef,dct_parity,6,ok,,64,64,64,,v1,1.01,0,64,1,,,131.60,165.34,26.89,72.64,376.6,0.765,0.9899,test_0002,val2017,12616.1807,0.0035,32,2.15,1,dct_parity,polygon-mumbai
+f3056e09c375,1756220861,deadbeef,dwt_svd,7,ok,,64,64,64,,v1,1.26,0,64,1,,,140.45,159.45,28.97,41.33,409.0,0.770,0.9874,test_0002,val2017,12616.1807,0.0025,32,2.38,1,dwt_svd,polygon-mumbai
+ace49f3b1cfb,1756220861,deadbeef,dwt_svd_adv,8,ok,,64,64,64,,v1,1.09,0,64,1,,,162.99,164.39,21.12,48.57,354.8,0.780,0.9891,test_0002,val2017,12616.1807,0.0022,32,2.12,1,dwt_svd_adv,polygon-mumbai

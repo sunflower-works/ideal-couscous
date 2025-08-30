@@ -50,23 +50,23 @@ def fmt(v):
         return v
 
 def build_table(device, size, rows, caption_base, label_base):
-    # Sort by typical order fp32, fp16, int8, others alphabetically
-    order_key = {"fp32":0, "fp16":1, "int8":2}
-    rows_sorted = sorted(rows, key=lambda r: order_key.get(r['precision'], 99))
-    header_line = " ".join([HEADER_LABELS[h] for h in HEADER_ORDER])
+    # Sort by typical order fp32, fp16, int8; others to the end
+    order_key = {"fp32": 0, "fp16": 1, "int8": 2}
+    rows_sorted = sorted(rows, key=lambda r: order_key.get(r.get("precision", ""), 99))
     lines = []
     lines.append("% Device: {}  Size: {}".format(device, size))
     lines.append("\\begin{table}[h]")
     lines.append("\\centering")
     lines.append("\\small")
-    col_spec = "l" + "r"*(len(HEADER_ORDER)-1)
+    col_spec = "l" + "r" * (len(HEADER_ORDER) - 1)
     lines.append(f"\\begin{{tabular}}{{{col_spec}}}")
     lines.append("\\toprule")
-    lines.append(" ".join([HEADER_LABELS[h] for h in HEADER_ORDER]).replace(" ", " & ") + " \\\")
+    header = " ".join(HEADER_LABELS[h] for h in HEADER_ORDER).replace(" ", " & ") + " \\\\"
+    lines.append(header)
     lines.append("\\midrule")
     for r in rows_sorted:
-        line = " & ".join(fmt(r.get(h)) for h in HEADER_ORDER) + " \\\")
-        lines.append(line)
+        row_line = " & ".join(fmt(r.get(h)) for h in HEADER_ORDER) + " \\\\" 
+        lines.append(row_line)
     lines.append("\\bottomrule")
     lines.append("\\end{tabular}")
     cap = f"{caption_base} (device={device}, {size}px)"

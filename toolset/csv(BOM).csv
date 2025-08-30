@@ -1,0 +1,38 @@
+Qty;Purchased?;Component / Item;Estimated Price (MAD);Source / Availability;Notes
+1;FAUX;Victron SmartSolar MPPT 75/15;MAD 1 600,00;Jumia Morocco (in stock);"75V max input, 15A charge current; essential for managing solar energy."
+1;FAUX;DTOF LD19 LiDAR Sensor (D500 Lidar Developer Kit);MAD 1 500,00;a2itronic.ma (in stock);"360° scanning LiDAR (12m range); for mapping/obstacle detection."
+1;VRAI;Adeept RaspClaws Hexapod V3;MAD 1 200,00;Adeept / local robotics distributor;Complete hexapod platform for mobile robotics applications.
+1;VRAI;Argon One V3 + NVMe Header;MAD 1 200,00;Local supplier / Online (assumed in stock);Advanced case and cooling solution for Raspberry Pi with NVMe support.
+1;FAUX;Solar Panel Array (80W–100W);MAD 1 200,00;Jumia / Misterelec (in stock);"Renewable energy source; sized based on power requirements."
+1;VRAI;"Seagate Constellation ES.3 HDD 3.5""";MAD 1 050,00;Jumia Morocco (in stock);Agnostic storage solution for data logging and processing.
+1;VRAI;Raspberry Pi 5 B 8GB;MAD 800,00;Jumia / Misterelec (check availability);"Main processing unit running ROS; serves as the brain of the rover."
+1;VRAI;Jetson Orin Nano Super 8GB;MAD 6 900,00;Aytoo.ma (in stock);High-performance AI edge computing platform for robotics/vision.
+1;VRAI;Raspberry Pi 5 2GB;MAD 650,00;Aytoo.ma (in stock);Cost-effective variant of Pi 5 for lighter processing tasks.
+2;FAUX;TTGO LoRa32 V1.3 – Module ESP32 with LoRa 868?MHz;900;micro-planet.ma;Cellular crypto module for blockchain comms
+1;VRAI;Kitronik 5038 HAT;MAD 580,00;Local supplier / Online (assumed in stock);Specialized HAT for environmental or other auxiliary functionalities.
+1;VRAI;Uni-T UT89X Multimeter;MAD 550,00;Jumia (in stock);Offers voltage and current measurements, LED testing.
+1+;NULL;High-Discharge 3S LiPo Battery (2200mAh, 11.1V, 30C);MAD 500,00;Jumia Morocco (in stock);Multiple units can be parallelized to achieve desired capacity.
+1;VRAI;Waveshare PoE+ HAT for RPi 5;MAD 450,00;Jumia / Misterelec (in stock);Pass-through GPIO plus PoE+ power delivery to Raspberry Pi.
+1;VRAI;Hikvision Switch PoE 4 Ports DS-3E0105P-E/M;MAD 388,00;Local supplier / Online (assumed in stock);"10/100M switch with PoE; provides network and power distribution for PoE-capable devices."
+1;VRAI;Raspberry Pi Zero 2W;MAD 300,00;Jumia / Misterelec (in stock);Dual-core MCU with Wi-Fi/Bluetooth for bridging or data aggregation.
+1;VRAI;Motor/Servo Control HATs;MAD 250,00;Jumia / Misterelec (in stock);"For controlling motors and servos; essential for rover mobility."
+1;VRAI;Additional Sensors (e.g., environmental, cameras);MAD 250,00;Jumia / Misterelec / Aytoo;"Depending on project requirements; e.g. humidity, temperature, extra cameras."
+1;FAUX;Protective Enclosures;MAD 200,00;Jumia / Misterelec (in stock);Shields sensitive electronics from environmental hazards.
+1;VRAI;Wiring;MAD 200,00;Jumia / Misterelec (in stock);Includes shielded cables, connectors, ties, etc.
+1;VRAI;10DOF IMU Module;MAD 150,00;Local electronics stores / Jumia;Combines accelerometer, gyroscope, magnetometer, etc. for precise orientation.
+1;VRAI;Passive Components (Capacitors, Resistors);MAD 150,00;Local electronics stores / Jumia;Decoupling, filtering, stabilizing sensor/MCU circuits.
+1;VRAI;Mounting Hardware & Accessories;MAD 150,00;Jumia / Misterelec (in stock);Brackets, screws, anti-vibration materials for stable sensor/board installation.
+1;VRAI;XL4005 5A Buck Converter CC-CV;MAD 120,00;micro-planet.ma;DC-DC buck converter with voltmeter/ammeter.
+1;VRAI;XL4016 300W 8A Buck Converter CC-CV;MAD 110,00;micro-planet.ma;High-power DC-DC buck converter.
+1;FAUX;XT60 Connector Kit;MAD 100,00;Jumia (in stock);XT60 T-connector (male & female) with ~15AWG–16AWG wires.
+1;VRAI;YFS201 Water Flow Sensor 1-30L/min;MAD 90,00;micro-planet.ma;Flow sensor module (1-30L/min).
+1;VRAI;CSI/MIPI Ribbon Cable for Camera Module;MAD 80,00;Jumia / Misterelec (in stock);Required for connecting a camera module to the Pi’s CSI port.
+1;FAUX;Inline Fuse-Holder 1P – 50A;MAD 75,00;Jumia (in stock);1 pole fuse holder (14×51 mm fuse) rated at 50A for battery/power line protection.
+1;FAUX;External Cellular Antenna 5G Magnetic RG195;MAD 60,00;soselectronic.com [I];1m SMA male, Black, IP65
+1;VRAI;INA169 Current/voltage Sensor;MAD 50,00;micro-planet.ma;Current sensor module.
+1;VRAI;BH1750FVI Digital Ambient Light Sensor;MAD 48,00;micro-planet.ma;Digital light intensity sensor module.
+1;VRAI;JK 3S 20A BMS Lithium 3 Cells rev 1.1;MAD 35,00;micro-planet.ma;Battery management system for 3-cell lithium batteries.
+5;VRAI;KY-026 Flame Sensor - IR;MAD 25,00;micro-planet.ma;Infrared flame detector module.
+1;VRAI;Electrolytic Capacitor - 10000uF 16V;MAD 8,00;Local electronics stores;High-capacity electrolytic capacitor for power filtering.
+;Count;;35;;
+;Average;; MAD 467,50 ;;

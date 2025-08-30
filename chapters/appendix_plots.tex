@@ -1,0 +1,31 @@
+% Appendix: Generated Plots
+\chapter{Supplementary Plots}\label{app:plots}
+
+This appendix collates auto-generated robustness, latency, and energy/cost
+figures referenced in Chapter~\ref{ch:exp} and Section~\ref{sec:method:viz}.
+All plots are produced by the reproducible toolchain (Make + scripts) and
+inserted as vector TikZ/PGF where possible.
+
+\section*{Robustness Curves}
+\begin{figure}[ht]
+  \centering
+  \input{figures/robustness_curve.tikz}\caption{Extraction accuracy vs JPEG quality (representative).}\label{fig:app:robustness_curve}
+\end{figure}
+
+\section*{Latency Distribution}
+\begin{figure}[ht]
+  \centering
+  \input{toolset/figures/anchoring_cost_generated.tikz.tex}\caption{Latency / anchoring cost breakdown (auto-generated).}\label{fig:app:anchoring_cost}
+\end{figure}
+
+\section*{Summary Table}
+\IfFileExists{results/figures/latency_table_generated.tex}{\input{results/figures/latency_table_generated}}{(Latency table not yet generated.)}
+
+\paragraph{Reproduction.} Invoke:
+\begin{minted}[fontsize=\scriptsize]{bash}
+make analyze   # regenerates metrics + figures
+make build     # embeds refreshed assets
+\end{minted}
+
+All plot inputs reside under \texttt{toolset/} and \texttt{results/} subtrees; git
+history tracks provenance hashes for audit.

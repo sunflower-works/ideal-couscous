@@ -1,0 +1,2 @@
+# schema: benchmark export v1
+run_uuid,timestamp,git_commit,algorithm,round_idx,status,fail_reason,payload_bits_requested,payload_bits_embedded,payload_bits_recovered,payload_hash,payload_fmt_version,ber_percent,ber_bits_wrong,bits_total,success_flag,psnr_db,ssim,embed_ms,extract_ms,watermark_strength,robustness_score,image_id,image_category,image_blur_metric,anchoring_fee_usd,digest_bytes,tx_confirm_s,gpu_flag,algo_variant,blockchain,imperceptibility_norm

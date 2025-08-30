@@ -1,0 +1,44 @@
+% Appendix: Discrete Wavelet Transform Refresher
+\chapter{Discrete Wavelet Transform Refresher}\label{app:dwt}
+
+This appendix gives a compact mathematical refresher on the (single–level) 2-D
+Discrete Wavelet Transform (DWT) used by the frequency watermark layer.
+
+\paragraph{1-D filter bank view.} A separable orthogonal wavelet (e.g. Haar)
+implements analysis via low–pass $h[n]$ and high–pass $g[n]$ filters followed by
+down–sampling by 2. For a 1-D signal $x[n]$ the approximation and detail
+coefficients are
+\[
+  a_k = \sum_n x[n] h[2k-n],\qquad d_k = \sum_n x[n] g[2k-n].
+\]
+Synthesis inverts this with up–sampling and the corresponding synthesis filters.
+
+\paragraph{2-D extension.} Applying the 1-D transform first along image rows
+then columns yields four equal–sized sub-bands: LL (approximation), LH (vertical
+detail), HL (horizontal detail), HH (diagonal detail). Only a single level is
+required for our embedding; deeper levels increase latency and reduce spatial
+localisation.
+
+\paragraph{Energy compaction rationale.} Natural images concentrate most
+variance in the LL band; embedding in selected singular values of wavelet-block
+coefficients (LL or detail bands depending on robustness/imperceptibility
+trade) allows small perturbations to survive moderate compression while staying
+below human perceptual thresholds.
+
+\paragraph{Why Haar?} Haar has integer coefficients (fast on edge devices) and
+no boundary extension complexity; more elaborate biorthogonal wavelets (e.g.
+Daubechies 9/7) marginally improve imperceptibility but raise compute cost.
+
+\paragraph{Reference Figure.} Figure~\ref{fig:dwt_layout_ref} sketches the band
+layout (single level). The watermark selects blocks under a keyed PRNG mask.
+
+\begin{figure}[ht]
+  \centering
+  \input{figures/dwt_revised.tikz}
+  \caption{Single-level 2-D DWT band layout (LL, LH, HL, HH).}
+  \label{fig:dwt_layout_ref}
+\end{figure}
+
+\paragraph{Relation to Section~\ref{subsec:embedding-layer}.} The notation in
+Eq.~\eqref{eq:svd_quant} assumes the block-wise \gls{svd} is applied after the \gls{dwt} on
+a chosen band; this appendix formalises the transform underlying that step.
