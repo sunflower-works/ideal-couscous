@@ -50,3 +50,8 @@ Thumbs.db
 
 # Local logs
 orin-logs.txt
+scripts/stab.sh
+thesis.bcf-SAVE-ERROR
+assessment.txt
+.idea/report.iml
+.idea/inspectionProfiles/Project_Default.xml
