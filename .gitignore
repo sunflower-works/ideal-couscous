@@ -1,0 +1,52 @@
+# Python caches and virtualenvs
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.venv/
+venv/
+ENV/
+
+# IDE/editor
+.vscode/
+.idea/
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.glg
+*.glo
+*.gls
+*.ist
+*.lof
+*.log
+*.lot
+*.out
+*.run.xml
+*.toc
+*.wmidx
+*.xwm
+_minted/
+
+# Generated PDFs (keep sources in .tex)
+thesis*.pdf
+poster.pdf
+
+# Repo outputs and generated content
+results/
+toolset/figures/*generated*
+toolset/unified/
+toolset/pi_suite/mini_test/
+
+# Misc
+.DS_Store
+Thumbs.db
+
+# Local logs
+orin-logs.txt
