@@ -1,0 +1,124 @@
+.ONESHELL:  # All commands in a recipe run in the same shell
+SHELL := /bin/bash
+
+# Raspberry Pi 5 (8GB) pipeline using ONNX Runtime CPU
+# Usage examples:
+#   make -f Makefile.rpi5 all
+#   make -f Makefile.rpi5 DRY_RUN=1 all   # dry-run (print commands only)
+
+# Defaults
+EDGE_ROOT ?= $(HOME)/edge-yolo
+IMG_SIZE ?= 320
+WARMUP ?= 20
+ITERS ?= 200
+CALIB_COUNT ?= 256
+CALIB_SAMPLES ?= $(CALIB_COUNT)
+CALIB_SUBSETS ?= val2017
+COCO_SUBSETS ?= val2017 annotations
+COCO_SIZE_TOL ?= 6
+COCO_ALLOW_LARGER ?= 1
+COCO_EXTRA ?=
+
+# Writable COCO root detection
+COCO_CANDIDATES := $(HOME)/coco $(HOME)/data/coco /data/coco
+COCO_ROOT ?= $(shell for d in $(COCO_CANDIDATES); do mkdir -p $$d >/dev/null 2>&1 && test -w $$d && echo $$d && break; done)
+
+ifeq ($(strip $(COCO_ROOT)),)
+$(warning No writable COCO root found; set COCO_ROOT explicitly.)
+COCO_ROOT := $(HOME)/coco
+endif
+
+# Output controls
+DRY_RUN ?= 0                 # 1=print commands without executing
+QUIET ?= 0                   # 1=less verbose output
+# Helper to toggle execution vs print; prefix with @ to avoid make's own echo
+RUN := $(if $(filter 1,$(DRY_RUN)),echo ,)
+AT := @
+PIP_Q := $(if $(filter 1,$(QUIET)),-q,)
+
+VENV := $(EDGE_ROOT)/.venv
+PY := $(VENV)/bin/python
+PIP := $(VENV)/bin/pip
+SCRIPTS_DIR := $(CURDIR)
+PROJECT_ROOT := $(abspath $(CURDIR)/..)
+PROJECT_RESULTS := $(PROJECT_ROOT)/results/figures
+
+# Helper to ensure venv python (skip when DRY_RUN=1)
+define ensure_venv
+  if [ "$(strip $(DRY_RUN))" = "1" ]; then :; elif [ ! -x $(PY) ]; then \
+    echo "[i] Python venv missing; run 'make -f Makefile.rpi5 env' first"; exit 2; fi
+endef
+
+.PHONY: env coco-download calib-subset bench consolidate report all dry-all clean-engines
+
+env:
+	@echo "[i] Setting up venv in $(EDGE_ROOT)"
+	$(AT)$(RUN)mkdir -p $(EDGE_ROOT)
+	$(AT)$(RUN)python3 -m venv $(VENV)
+	$(AT)$(RUN)$(PY) -m pip install $(PIP_Q) --upgrade pip wheel setuptools
+	# base deps (onnxruntime is handled best-effort by the RPi script too)
+	$(AT)$(RUN)$(PIP) install $(PIP_Q) ultralytics onnx onnxsim numpy opencv-python tqdm rich
+	@echo "[i] venv ready"
+
+coco-download:
+	@echo "[i] COCO root: $(COCO_ROOT)  subsets: $(COCO_SUBSETS) tol=$(COCO_SIZE_TOL)% allow_larger=$(COCO_ALLOW_LARGER)"
+	$(AT)$(RUN)mkdir -p $(COCO_ROOT)
+	@$(call ensure_venv)
+	$(AT)$(RUN)$(PY) $(SCRIPTS_DIR)/download_coco.py --output-dir $(COCO_ROOT) --subsets $(COCO_SUBSETS) \
+		--size-tolerance-pct $(COCO_SIZE_TOL) $(if $(filter 1,$(COCO_ALLOW_LARGER)),--allow-larger,) $(COCO_EXTRA)
+
+calib-subset:
+	@$(call ensure_venv)
+	@echo "[i] Building calib subset -> $(EDGE_ROOT)/calib_images (N=$(CALIB_COUNT))"
+	$(AT)$(RUN)cd $(EDGE_ROOT)
+	$(AT)$(RUN)$(PY) $(SCRIPTS_DIR)/make_calib_subset.py --coco-root $(COCO_ROOT) --subsets $(CALIB_SUBSETS) \
+		--count $(CALIB_COUNT) --out-dir calib_images --deterministic
+
+# Single-precision ONNX Runtime CPU run on Raspberry Pi (writes detector_latency_rpi_$(IMG_SIZE).json)
+bench:
+	@$(call ensure_venv)
+	@echo "[i] Benchmarking on RPi5 ORT: IMG_SIZE=$(IMG_SIZE) WARMUP=$(WARMUP) ITERS=$(ITERS)"
+	$(AT)$(RUN)mkdir -p $(EDGE_ROOT)/logs
+	$(AT)$(RUN)cd $(EDGE_ROOT)
+	$(AT)$(RUN)if [ "$(QUIET)" = "1" ]; then \
+		QUIET=$(QUIET) WARMUP=$(WARMUP) ITERS=$(ITERS) bash $(SCRIPTS_DIR)/10_rpi_yolov8_ort.sh $(EDGE_ROOT) $(IMG_SIZE) \
+		  > $(EDGE_ROOT)/logs/rpi5_bench_$(IMG_SIZE).log 2>&1; \
+		echo "[i] Bench complete (log=$(EDGE_ROOT)/logs/rpi5_bench_$(IMG_SIZE).log)"; \
+	  else \
+		QUIET=$(QUIET) WARMUP=$(WARMUP) ITERS=$(ITERS) bash $(SCRIPTS_DIR)/10_rpi_yolov8_ort.sh $(EDGE_ROOT) $(IMG_SIZE); \
+	  fi
+
+consolidate:
+	@$(call ensure_venv)
+	@echo "[i] Consolidating (device=Raspberry Pi 5 (8GB), imgsz=$(IMG_SIZE))"
+	$(AT)$(RUN)cd $(EDGE_ROOT)
+	$(AT)$(RUN)$(PY) $(SCRIPTS_DIR)/consolidate_edge_report.py \
+		--latency-json-glob "detector_latency_rpi_$(IMG_SIZE).json" \
+		--map-glob "map_metrics_$(IMG_SIZE)_*.json" \
+		--device "Raspberry Pi 5 (8GB)" --imgsz $(IMG_SIZE) \
+		--out-tex results/figures/edge_inference_report.tex \
+		--out-json results/figures/edge_inference_report.json
+
+report: consolidate
+	@echo "[i] Report artefacts generated under $(EDGE_ROOT)/results/figures"
+
+# Copy consolidated artifacts into the repo for convenience
+.PHONY: sync-results
+sync-results:
+	@echo "[i] Syncing artifacts into repo: $(PROJECT_RESULTS)"
+	$(AT)$(RUN)mkdir -p $(PROJECT_RESULTS)
+	$(AT)$(RUN)cp -f $(EDGE_ROOT)/results/figures/*.tex $(PROJECT_RESULTS) 2>/dev/null || true
+	$(AT)$(RUN)cp -f $(EDGE_ROOT)/results/figures/*.json $(PROJECT_RESULTS) 2>/dev/null || true
+
+clean-engines:
+	@echo "[i] Nothing to clean for ORT (no TensorRT engines). Removing previous latency files."
+	$(AT)$(RUN)rm -f $(EDGE_ROOT)/detector_latency_rpi_*_*.json || true
+	$(AT)$(RUN)rm -f $(EDGE_ROOT)/detector_latency_rpi_*.json || true
+
+# Convenience: dry run wrapper
+dry-all:
+	@$(MAKE) -f $(firstword $(MAKEFILE_LIST)) DRY_RUN=1 all
+
+
+all: env coco-download calib-subset bench report sync-results
+	@echo "[i] Full pipeline complete (RPi5/ORT)"
