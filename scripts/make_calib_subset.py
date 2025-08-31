@@ -134,9 +134,7 @@ def main():
         if args.copy:
             if args.resize_max > 0:
                 try:
-                    resize_if_needed(p, dst, args.resize_max)
-                except Exception as e:
-                    print(f"[w] resize failed for {p.name}: {e}; copying")
+                    print(f"[w] Failed to resize image {p.name}: {e}; falling back to direct copy")
                     shutil.copy2(p, dst)
             else:
                 shutil.copy2(p, dst)
