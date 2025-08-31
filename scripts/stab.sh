@@ -33,8 +33,7 @@ fi
 
 # Warn if invoked via wrong relative path (common pitfall: inside scripts dir running 'bash scripts/stab.sh')
 SCRIPT_BASENAME=$(basename "$0")
-if [[ "$SCRIPT_BASENAME" != "stab.sh" ]]; then
-  echo "[w] Unexpected script invocation name: $SCRIPT_BASENAME" >&2
+  echo "[w] Unexpected script invocation name: $SCRIPT_BASENAME. This may indicate incorrect script path resolution. Please run the script as './stab.sh' from the scripts directory." >&2
 fi
 
 # Files to sync (explicit allowlist)
