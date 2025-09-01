@@ -16,6 +16,8 @@ import sys
 
 import cv2 as cv
 import numpy as np
+import subprocess
+
 
 try:
     import tensorrt as trt
@@ -37,6 +39,16 @@ except Exception:  # pragma: no cover
         print("[e] Neither cuda-python nor pycuda available.", file=sys.stderr)
         sys.exit(1)
 
+def _trt_ge(major: int, minor: int = 0) -> bool:
+    """Return True if installed TensorRT version >= major.minor."""
+    try:
+        ver = trt.__version__.split("+", 1)[0]
+        parts = [int(p) for p in ver.split(".")[:3]]
+        while len(parts) < 3:
+            parts.append(0)
+        return tuple(parts) >= (major, minor, 0)
+    except Exception:
+        return False
 
 def letterbox(img, size, color=(114, 114, 114)):
     h, w = img.shape[:2]
@@ -142,17 +154,199 @@ def build_int8(
         raise SystemExit(f"[e] No calibration images found in {calib_dir}")
     print(f"[i] Calibration images: {len(imgs)} (batch={batch})")
     config = builder.create_builder_config()
-    config.set_flag(trt.BuilderFlag.INT8)
-    config.max_workspace_size = 4 << 30  # 4GB cap
+    # Workspace configuration: TRT <10 uses max_workspace_size; TRT >=10 uses memory pool limit
+    if hasattr(config, "set_memory_pool_limit"):
+        try:
+            config.set_memory_pool_limit(trt.MemoryPoolType.WORKSPACE, int(4 << 30))
+        except Exception:
+            pass
+    else:
+        try:
+            config.max_workspace_size = 4 << 30  # legacy
+        except Exception:
+            pass
+
+    def _build_and_write(net, want_int8: bool) -> bool:
+        # Set INT8 flag only when building a Q/DQ-quantized network or when using calibrator on TRT<10
+        if want_int8:
+            config.set_flag(trt.BuilderFlag.INT8)
+        else:
+            try:
+                config.clear_flag(trt.BuilderFlag.INT8)  # TRT>=10
+            except Exception:
+                pass
+        if hasattr(builder, "build_serialized_network"):
+            plan = builder.build_serialized_network(net, config)
+            if plan is None:
+                return False
+            with open(engine_path, "wb") as f:
+                f.write(plan)
+            return True
+        else:
+            eng = builder.build_engine(net, config)
+            if eng is None:
+                return False
+            with open(engine_path, "wb") as f:
+                f.write(eng.serialize())
+            return True
+
+    # TRT >= 10: prefer explicit Q/DQ PTQ, do NOT use calibrators (deprecated/unstable)
+    if _trt_ge(10, 0):
+        try:
+            from onnxruntime.quantization import (  # type: ignore
+                CalibrationDataReader,
+                QuantType,
+                QuantFormat,
+                CalibrationMethod,
+                quantize_static,
+            )
+            import onnx  # type: ignore
+            import cv2 as cv  # local import to avoid heavy import at module import time
+            import numpy as np
+
+            m = onnx.load(onnx_path)
+            input_name = m.graph.input[0].name
+
+            class YOLODataReader(CalibrationDataReader):
+                def __init__(self, images, input_name, size):
+                    self.images = images
+                    self.input_name = input_name
+                    self.size = size
+                    self.idx = 0
+                def get_next(self):
+                    while self.idx < len(self.images):
+                        p = self.images[self.idx]
+                        self.idx += 1
+                        im = cv.imread(p)
+                        if im is None:
+                            continue
+                        x = letterbox(im, self.size).transpose(2, 0, 1)[None].astype(np.float32) / 255.0
+                        return {self.input_name: x}
+                    return None
+
+            op_types = ["Conv", "MatMul", "Gemm"]
+            reader = YOLODataReader(imgs[: max(1, min(64, len(imgs)))], input_name, imgsz)
+            qdq_path = os.path.splitext(onnx_path)[0] + "_int8_qdq.onnx"
+
+            quantize_static(
+                model_input=onnx_path,
+                model_output=qdq_path,
+                calibration_data_reader=reader,
+                quant_format=QuantFormat.QDQ,
+                weight_type=QuantType.QInt8,      # symmetric weights
+                activation_type=QuantType.QInt8,  # symmetric activations
+                per_channel=True,                 # per-channel weights
+                calibrate_method=CalibrationMethod.MinMax,
+                op_types_to_quantize=op_types,
+                extra_options={
+                    "ActivationSymmetric": True,
+                    "WeightSymmetric": True,
+                    "QuantizeBias": False,        # avoid bias Q/DQ
+                    "DedicatedQDQPair": True,
+                    "EnableSubgraph": True,
+                },
+            )
+            print(f"[i] Wrote Q/DQ quantized ONNX -> {qdq_path}")
+
+            # Parse quantized model and build INT8 (no calibrator)
+            network_q = builder.create_network(flag)
+            parser_q = trt.OnnxParser(network_q, logger)
+            with open(qdq_path, "rb") as f:
+                if not parser_q.parse(f.read()):
+                    for i in range(parser_q.num_errors):
+                        print(parser_q.get_error(i), file=sys.stderr)
+                    raise RuntimeError("[e] Failed to parse quantized ONNX")
+
+            # Ensure no calibrator is set on TRT>=10 to avoid deprecation warnings
+            try:
+                if hasattr(config, "int8_calibrator"):
+                    config.int8_calibrator = None  # harmless on TRT<10; silenced by try on TRT>=10
+            except Exception:
+                pass
+
+            if _build_and_write(network_q, want_int8=True):
+                print(f"[i] Wrote INT8 engine {engine_path} (from Q/DQ ONNX)")
+                return
+            raise RuntimeError("[e] Engine build failed from Q/DQ ONNX")
+        except Exception as e:
+            print(f"[e] PTQ fallback failed: {e}", file=sys.stderr)
+            # Let the outer pipeline fall back to trtexec
+            raise SystemExit("[e] Engine build failed (serialized network is None)")
+    # TRT < 10: use entropy calibrator path
     calibrator = EntropyCalibrator(imgs, batch, (c, h, w), cache_file)
-    config.int8_calibrator = calibrator
+    try:
+        config.int8_calibrator = calibrator
+    except Exception:
+        pass
     print("[i] Building INT8 engine...")
-    engine = builder.build_engine(network, config)
-    if engine is None:
-        raise SystemExit("[e] Engine build failed")
-    with open(engine_path, "wb") as f:
-        f.write(engine.serialize())
-    print(f"[i] Wrote INT8 engine {engine_path}")
+    if _build_and_write(network, want_int8=True):
+        print(f"[i] Wrote INT8 engine {engine_path}")
+        return
+    # As a last resort on TRT<10, try Q/DQ as above (optional)
+    try:
+        from onnxruntime.quantization import (  # type: ignore
+            CalibrationDataReader,
+            QuantType,
+            QuantFormat,
+            CalibrationMethod,
+            quantize_static,
+        )
+        import onnx  # type: ignore
+        import cv2 as cv
+        import numpy as np
+        m = onnx.load(onnx_path)
+        input_name = m.graph.input[0].name
+        class YOLODataReader(CalibrationDataReader):
+            def __init__(self, images, input_name, size):
+                self.images = images; self.input_name = input_name; self.size = size; self.idx = 0
+            def get_next(self):
+                while self.idx < len(self.images):
+                    p = self.images[self.idx]; self.idx += 1
+                    im = cv.imread(p)
+                    if im is None: continue
+                    x = letterbox(im, self.size).transpose(2,0,1)[None].astype(np.float32)/255.0
+                    return {self.input_name: x}
+                return None
+        op_types = ["Conv", "MatMul", "Gemm"]
+        reader = YOLODataReader(imgs[: max(1, min(64, len(imgs)))], input_name, imgsz)
+        qdq_path = os.path.splitext(onnx_path)[0] + "_int8_qdq.onnx"
+        quantize_static(
+            model_input=onnx_path,
+            model_output=qdq_path,
+            calibration_data_reader=reader,
+            quant_format=QuantFormat.QDQ,
+            weight_type=QuantType.QInt8,
+            activation_type=QuantType.QInt8,
+            per_channel=True,
+            calibrate_method=CalibrationMethod.MinMax,
+            op_types_to_quantize=op_types,
+            extra_options={
+                "ActivationSymmetric": True,
+                "WeightSymmetric": True,
+                "QuantizeBias": False,
+                "DedicatedQDQPair": True,
+                "EnableSubgraph": True,
+            },
+        )
+        print(f"[i] Wrote Q/DQ quantized ONNX -> {qdq_path}")
+        network_q = builder.create_network(flag)
+        parser_q = trt.OnnxParser(network_q, logger)
+        with open(qdq_path, "rb") as f:
+            if not parser_q.parse(f.read()):
+                for i in range(parser_q.num_errors):
+                    print(parser_q.get_error(i), file=sys.stderr)
+                raise RuntimeError("[e] Failed to parse quantized ONNX")
+        try:
+            config.int8_calibrator = None
+        except Exception:
+            pass
+        if _build_and_write(network_q, want_int8=True):
+            print(f"[i] Wrote INT8 engine {engine_path} (from Q/DQ ONNX)")
+            return
+    except Exception as e:
+        print(f"[e] PTQ fallback failed: {e}", file=sys.stderr)
+    raise SystemExit("[e] Engine build failed (serialized network is None)")
+
 
 
 def main():

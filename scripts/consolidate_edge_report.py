@@ -37,6 +37,7 @@ import json
 from pathlib import Path
 from typing import Dict, List
 
+
 PRECISION_ORDER = {"fp32": 0, "fp16": 1, "int8": 2, "ort": 3, "ov": 4, "ov_int8": 5}
 
 LAT_HEADERS = [
@@ -190,10 +191,10 @@ def latex_table(
         "p50_ms": "p50",
         "p95_ms": "p95",
         "fps_mean": "FPS",
-    "speedup": "Speedup",
-    "temp_c_min": "Temp min (°C)",
-    "temp_c_avg": "Temp avg (°C)",
-    "temp_c_max": "Temp max (°C)",
+        "speedup": "Speedup",
+        "temp_c_min": "Temp min (°C)",
+        "temp_c_avg": "Temp avg (°C)",
+        "temp_c_max": "Temp max (°C)",
         "map50": "mAP@0.5",
         "map50_95": "mAP@0.5:0.95",
     }

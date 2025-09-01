@@ -234,8 +234,8 @@ class LSBWatermarker:
     def embed(
         self, img: Image.Image, payload_bits: Iterable[int], key: str
     ) -> WatermarkResult:
-        warnings.warn(
-            "LSBWatermarker is legacy and not recommended for robust use.",
+            "LSBWatermarker is legacy and fragile to compression attacks; not recommended for robust use.",
+
             RuntimeWarning,
         )
         payload = list(payload_bits)

@@ -1,0 +1,11 @@
+# schema: benchmark export v1
+run_uuid,timestamp,git_commit,algorithm,round_idx,status,embed_ms,extract_ms,success_flag
+ed6b5bed7511,1756220861,deadbeef,dct_parity,0,ok,153.84,174.60,1
+daf3e2662185,1756220861,deadbeef,dwt_svd,1,ok,165.58,139.44,1
+184dbee2c49c,1756220861,deadbeef,dwt_svd_adv,2,ok,139.91,134.87,1
+cfad63d7526a,1756220861,deadbeef,dct_parity,3,ok,164.13,180.02,1
+9bacf418b04e,1756220861,deadbeef,dwt_svd,4,ok,157.33,173.33,1
+a548b95e3f52,1756220861,deadbeef,dwt_svd_adv,5,ok,144.85,176.29,1
+93cd83bc9d82,1756220861,deadbeef,dct_parity,6,ok,131.60,165.34,1
+f3056e09c375,1756220861,deadbeef,dwt_svd,7,ok,140.45,159.45,1
+ace49f3b1cfb,1756220861,deadbeef,dwt_svd_adv,8,ok,162.99,164.39,1

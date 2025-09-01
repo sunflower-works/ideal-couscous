@@ -33,6 +33,8 @@ echo "[i] Starting build+benchmark (size=$INPUT_SIZE precision=$PRECISION)"
 cd "$ROOT"
 [ -f .venv/bin/activate ] && source .venv/bin/activate || true
 PYTHON=${PYTHON:-python3}
+MODEL=${MODEL:-yolov8n.pt}
+
 
 case "$PRECISION" in
   fp32|fp16|int8) ;;
@@ -40,11 +42,25 @@ case "$PRECISION" in
   *) echo "[e] Unsupported PRECISION=$PRECISION (use fp32|fp16|int8)" >&2; exit 2;;
 esac
 
-if ! command -v trtexec >/dev/null 2>&1; then
-  echo "[e] trtexec not in PATH. Install or add to PATH." >&2; exit 1
+# Locate trtexec (PATH or common Jetson locations)
+TRTEXEC="trtexec"
+if ! command -v "$TRTEXEC" >/dev/null 2>&1; then
+  CANDIDATES=(
+    /usr/src/tensorrt/bin/trtexec
+    /usr/src/tensorrt/samples/trtexec
+    /opt/nvidia/tensorrt/bin/trtexec
+    /usr/local/tensorrt/bin/trtexec
+  )
+  for c in "${CANDIDATES[@]}"; do
+    if [ -x "$c" ]; then TRTEXEC="$c"; break; fi
+  done
+fi
+if ! command -v "$TRTEXEC" >/dev/null 2>&1 && [ ! -x "$TRTEXEC" ]; then
+  echo "[e] trtexec not found. Install TensorRT or add trtexec to PATH." >&2; exit 1
 fi
 
-TRT_HELP=$(trtexec --help 2>/dev/null || true)
+TRT_HELP=$("$TRTEXEC" --help 2>/dev/null || true)
+
 if echo "$TRT_HELP" | grep -q -- '--memPoolSize'; then
   TRT_NEW_API=1
 else
@@ -53,16 +69,15 @@ fi
 
 echo "[i] TensorRT API mode: $([ $TRT_NEW_API -eq 1 ] && echo 'new(>=10)' || echo 'legacy(<10)')"
 
-# Ensure helper scripts present (force copy if missing)
+# Ensure helper scripts are up to date (sync from scripts dir when available)
 HELPERS=(export_model.py bench_yolov8.py bench_trtexec.py build_int8_engine.py aggregate_latency.py make_calib_subset.py generate_latency_table.py evaluate_map.py list_int8_layers.py)
 for f in "${HELPERS[@]}"; do
-  if [ ! -f "$f" ]; then
-    if [ -f "$SCRIPT_DIR/$f" ]; then
-      cp "$SCRIPT_DIR/$f" .
-      echo "[i] Copied $f from scripts dir"
-    else
-      echo "[w] Helper $f not found locally or in script dir"
-    fi
+  if [ -f "$SCRIPT_DIR/$f" ]; then
+    cp -f "$SCRIPT_DIR/$f" .
+    echo "[i] Synced $f from scripts dir"
+  else
+    [ -f "$f" ] || echo "[w] Helper $f not found locally or in script dir"
+
   fi
 done
 
@@ -81,10 +96,14 @@ if [ "$PRECISION" = int8 ] && [ -z "$CALIB_DIR" ] && [ -n "$AUTO_CALIB_COCO_ROOT
   CALIB_DIR="$AUTO_CALIB_OUT"
 fi
 
-$PYTHON export_model.py --model yolov8n.pt --imgsz "$INPUT_SIZE" --out "yolov8n_${INPUT_SIZE}.onnx" --dynamic false || { echo "[e] export failed" >&2; exit 1; }
+STEM=$(basename "$MODEL")
+STEM="${STEM%.*}"  # drop extension
+OUT_ONNX="${STEM}_${INPUT_SIZE}.onnx"
+$PYTHON export_model.py --model "$MODEL" --imgsz "$INPUT_SIZE" --out "$OUT_ONNX" --dynamic false --nms true --max-det 300 || { echo "[e] export failed" >&2; exit 1; }
 
-ONNX_RAW="yolov8n_${INPUT_SIZE}.onnx"
-ONNX_SIM="yolov8n_${INPUT_SIZE}_sim.onnx"
+ONNX_RAW="$OUT_ONNX"
+ONNX_SIM="${STEM}_${INPUT_SIZE}_sim.onnx"
+
 if $PYTHON -c 'import onnxsim' 2>/dev/null; then
   echo "[i] Simplifying ONNX"
   $PYTHON - <<PY "$ONNX_RAW" "$ONNX_SIM"
@@ -100,7 +119,9 @@ else
   cp "$ONNX_RAW" "$ONNX_SIM"
 fi
 ONNX="$ONNX_SIM"
-ENGINE="yolov8n_${INPUT_SIZE}_${PRECISION}.engine"
+# Keep engine filename pattern stable for downstream aggregation
+ENGINE="${STEM}_${INPUT_SIZE}_${PRECISION}.engine"
+
 
 PY_TRT=0
 if $PYTHON - <<'PY'
@@ -111,23 +132,40 @@ else: sys.exit(0)
 PY
 then PY_TRT=1; fi
 
-# Optional Python INT8 build (calibrator)
-if [ "$PRECISION" = int8 ] && [ ! -f "$ENGINE" ] && [ -z "$CALIB_CACHE" ] && [ -n "$CALIB_DIR" ]; then
+# Optional Python INT8 build (calibrator) only when Python TensorRT is available
+if [ "$PRECISION" = int8 ] && [ $PY_TRT -eq 1 ] && [ ! -f "$ENGINE" ] && [ -z "$CALIB_CACHE" ] && [ -n "$CALIB_DIR" ]; then
   [ -d "$CALIB_DIR" ] || { echo "[e] CALIB_DIR $CALIB_DIR not found" >&2; exit 1; }
-  CALIB_CACHE="yolov8n_${INPUT_SIZE}_int8.calib"
+  CALIB_CACHE="${STEM}_${INPUT_SIZE}_int8.calib"
   echo "[i] Python INT8 calibration (dir=$CALIB_DIR samples=$CALIB_SAMPLES batch=$CALIB_BATCH)"
+  set +e
   $PYTHON build_int8_engine.py --onnx "$ONNX" --engine "$ENGINE" --imgsz "$INPUT_SIZE" \
-    --batch "$CALIB_BATCH" --calib_samples "$CALIB_SAMPLES" --calib_dir "$CALIB_DIR" --calib_cache "$CALIB_CACHE" || { echo "[e] Python INT8 build failed" >&2; exit 1; }
+    --batch "$CALIB_BATCH" --calib_samples "$CALIB_SAMPLES" --calib_dir "$CALIB_DIR" --calib_cache "$CALIB_CACHE"
+  RC=$?
+  set -e
+  if [ $RC -ne 0 ]; then
+    echo "[w] Python INT8 build failed; will fall back to trtexec-based INT8 build."
+    CALIB_CACHE=""  # allow trtexec to proceed without cache
+  fi
+elif [ "$PRECISION" = int8 ] && [ $PY_TRT -ne 1 ] && [ -n "$CALIB_DIR" ]; then
+  echo "[w] Python TensorRT not available; skipping Python calibrator. Building INT8 with trtexec (may require existing calib cache or fallback)."
+
 fi
 
 if [ ! -f "$ENGINE" ]; then
   BUILD_ARGS=( --onnx="$ONNX" --saveEngine="$ENGINE" )
   case "$PRECISION" in
-    fp32) : ;;
-    fp16) BUILD_ARGS+=( --fp16 ) ;;
+    fp32)
+      :
+      ;;
+    fp16)
+      BUILD_ARGS+=( --fp16 )
+      ;;
     int8)
       BUILD_ARGS+=( --int8 )
-      [ -n "$CALIB_CACHE" ] && BUILD_ARGS+=( --calib="$CALIB_CACHE" )
+      # Allow mixed precision kernels for performance (TRT will pick best)
+      [ $TRT_NEW_API -eq 1 ] && BUILD_ARGS+=( --best ) || true
+  [ -n "$CALIB_CACHE" ] && BUILD_ARGS+=( --calib="$CALIB_CACHE" )
+
       ;;
   esac
   if [ $TRT_NEW_API -eq 1 ]; then
@@ -135,8 +173,9 @@ if [ ! -f "$ENGINE" ]; then
   else
     BUILD_ARGS+=( --workspace=$WORKSPACE_MB --buildOnly )
   fi
-  echo "[i] trtexec ${BUILD_ARGS[*]}" | tee -a "$BUILD_LOG"
-  if ! trtexec "${BUILD_ARGS[@]}" 2>&1 | tee -a "$BUILD_LOG"; then
+  echo "[i] $TRTEXEC ${BUILD_ARGS[*]}" | tee -a "$BUILD_LOG"
+  if ! "$TRTEXEC" "${BUILD_ARGS[@]}" 2>&1 | tee -a "$BUILD_LOG"; then
+
     echo "[e] trtexec build failed" >&2; exit 1
   fi
 else
@@ -166,14 +205,15 @@ then USE_PYCUDA=1; fi
 
 if [ $USE_PYCUDA -eq 1 ]; then
   echo "[i] Benchmark via pycuda"
-  $PYTHON bench_yolov8.py --backend trt --engine "$ENGINE" --imgsz "$INPUT_SIZE" --warmup "$WARMUP" --iters "$ITERS" --out "$OUT_JSON"
+  $PYTHON bench_yolov8.py --backend trt --engine "$ENGINE" --imgsz "$INPUT_SIZE" --warmup "$WARMUP" --iters "$ITERS" --model-name "$STEM" --out "$OUT_JSON"
 else
   if [ -f bench_trtexec.py ]; then
-    echo "[i] Benchmark via trtexec fallback"
-    $PYTHON bench_trtexec.py --engine "$ENGINE" --imgsz "$INPUT_SIZE" --warmup "$WARMUP" --iters "$ITERS" --out "$OUT_JSON"
+    echo "[i] Benchmark via trtexec fallback (reason: Python TensorRT/pycuda not importable in venv)"
+    echo "[i] To enable pycuda path: apt install python3-libnvinfer-dev python3-libnvinfer python3-pycuda and recreate venv with --system-site-packages"
+    $PYTHON bench_trtexec.py --engine "$ENGINE" --imgsz "$INPUT_SIZE" --warmup "$WARMUP" --iters "$ITERS" --model-name "$STEM" --out "$OUT_JSON"
   else
     echo "[w] bench_trtexec.py missing; rough timing with trtexec built-in"
-    trtexec --loadEngine="$ENGINE" --iterations="$ITERS" --warmUp="$((WARMUP*10))" || true
+    "$TRTEXEC" --loadEngine="$ENGINE" --iterations="$ITERS" --warmUp="$((WARMUP*10))" || true
   fi
 fi
 

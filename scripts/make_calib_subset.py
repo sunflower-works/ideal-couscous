@@ -20,6 +20,7 @@ On Jetson (from 10_jetson_yolov8_trt.sh auto path):
   we call this script with --count=$CALIB_SAMPLES and output to auto folder.
 """
 import argparse
+import zipfile
 import random
 import shutil
 from pathlib import Path
@@ -73,11 +74,38 @@ def main():
         action="store_true",
         help="Take first N instead of random sample",
     )
+    ap.add_argument(
+        "--auto-extract",
+        action="store_true",
+        help="If subset dir missing, try to unzip subset.zip from COCO root or downloads/",
+    )
+
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
     imgs: List[Path] = []
     for subset in args.subsets:
+        subset_dir = args.coco_root / subset
+        if not subset_dir.exists() and args.auto_extract:
+            # Try to extract from zip archives if present
+            z1 = args.coco_root / f"{subset}.zip"
+            z2 = args.coco_root / "downloads" / f"{subset}.zip"
+            zsrc = None
+            if z1.is_file():
+                zsrc = z1
+            elif z2.is_file():
+                zsrc = z2
+            if zsrc is not None:
+                try:
+                    print(f"[i] Auto-extracting {zsrc} -> {args.coco_root}")
+                    with zipfile.ZipFile(zsrc, "r") as zf:
+                        zf.extractall(args.coco_root)
+                except Exception as e:
+                    print(f"[w] Failed to extract {zsrc}: {e}")
+            else:
+                print(
+                    f"[w] Subset {subset} missing and no zip found at {z1} or {z2}; continuing"
+                )
         try:
             subset_imgs = discover_images(args.coco_root, subset)
         except FileNotFoundError as e:

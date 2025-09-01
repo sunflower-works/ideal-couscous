@@ -8,7 +8,8 @@ SHELL := /bin/bash
 
 # Defaults
 EDGE_ROOT ?= $(HOME)/edge-yolo
-IMG_SIZE ?= 320
+IMG_SIZE ?= 480
+
 WARMUP ?= 20
 ITERS ?= 200
 CALIB_COUNT ?= 256
@@ -74,9 +75,10 @@ calib-subset:
 	$(AT)$(RUN)$(PY) $(SCRIPTS_DIR)/make_calib_subset.py --coco-root $(COCO_ROOT) --subsets $(CALIB_SUBSETS) \
 		--count $(CALIB_COUNT) --out-dir calib_images --deterministic
 
-# Single-precision ONNX Runtime CPU run on Raspberry Pi (writes detector_latency_rpi_$(IMG_SIZE).json)
+# Single-precision ONNX Runtime CPU run on Raspberry Pi (writes detector_latency_rpi5_$(IMG_SIZE)_ort.json)
 bench:
-	@$(call ensure_venv)
+	$(call ensure_venv)
+
 	@echo "[i] Benchmarking on RPi5 ORT: IMG_SIZE=$(IMG_SIZE) WARMUP=$(WARMUP) ITERS=$(ITERS)"
 	$(AT)$(RUN)mkdir -p $(EDGE_ROOT)/logs
 	$(AT)$(RUN)cd $(EDGE_ROOT)
@@ -87,13 +89,17 @@ bench:
 	  else \
 		QUIET=$(QUIET) WARMUP=$(WARMUP) ITERS=$(ITERS) bash $(SCRIPTS_DIR)/10_rpi_yolov8_ort.sh $(EDGE_ROOT) $(IMG_SIZE); \
 	  fi
+	$(call ensure_venv)
+	@echo "[i] Generating CSV from JSON results"
+	$(AT)$(RUN)cd $(EDGE_ROOT)
+	$(AT)$(RUN)$(PY) $(SCRIPTS_DIR)/aggregate_latency.py --glob "detector_latency_rpi5_$(IMG_SIZE)_*.json" --out "latency_comparative_$(IMG_SIZE).csv"
 
 consolidate:
-	@$(call ensure_venv)
+	$(call ensure_venv)
 	@echo "[i] Consolidating (device=Raspberry Pi 5 (8GB), imgsz=$(IMG_SIZE))"
 	$(AT)$(RUN)cd $(EDGE_ROOT)
 	$(AT)$(RUN)$(PY) $(SCRIPTS_DIR)/consolidate_edge_report.py \
-		--latency-json-glob "detector_latency_rpi_$(IMG_SIZE).json" \
+		--latency-csv "latency_comparative_$(IMG_SIZE).csv" \
 		--map-glob "map_metrics_$(IMG_SIZE)_*.json" \
 		--device "Raspberry Pi 5 (8GB)" --imgsz $(IMG_SIZE) \
 		--out-tex results/figures/edge_inference_report.tex \
@@ -102,6 +108,11 @@ consolidate:
 report: consolidate
 	@echo "[i] Report artefacts generated under $(EDGE_ROOT)/results/figures"
 
+clean-engines:
+	@echo "[i] Nothing to clean for ORT (no TensorRT engines). Removing previous latency files."
+	$(AT)$(RUN)rm -f $(EDGE_ROOT)/detector_latency_rpi5_*_*.json || true
+	$(AT)$(RUN)rm -f $(EDGE_ROOT)/latency_comparative_*.csv || true
+
 # Copy consolidated artifacts into the repo for convenience
 .PHONY: sync-results
 sync-results:
@@ -109,16 +120,45 @@ sync-results:
 	$(AT)$(RUN)mkdir -p $(PROJECT_RESULTS)
 	$(AT)$(RUN)cp -f $(EDGE_ROOT)/results/figures/*.tex $(PROJECT_RESULTS) 2>/dev/null || true
 	$(AT)$(RUN)cp -f $(EDGE_ROOT)/results/figures/*.json $(PROJECT_RESULTS) 2>/dev/null || true
-
-clean-engines:
-	@echo "[i] Nothing to clean for ORT (no TensorRT engines). Removing previous latency files."
-	$(AT)$(RUN)rm -f $(EDGE_ROOT)/detector_latency_rpi_*_*.json || true
-	$(AT)$(RUN)rm -f $(EDGE_ROOT)/detector_latency_rpi_*.json || true
+	$(AT)$(RUN)cp -f $(EDGE_ROOT)/latency_comparative_*.csv $(PROJECT_RESULTS) 2>/dev/null || true
 
 # Convenience: dry run wrapper
 dry-all:
 	@$(MAKE) -f $(firstword $(MAKEFILE_LIST)) DRY_RUN=1 all
 
-
 all: env coco-download calib-subset bench report sync-results
 	@echo "[i] Full pipeline complete (RPi5/ORT)"
+
+# Additional maintenance / reset targets
+
+# Extract already-downloaded COCO archives without re-downloading (handles each subset zip if present)
+coco-extract:
+	@echo "[i] Extracting COCO zips for subsets=$(COCO_SUBSETS) from $(COCO_ROOT)"
+	@set -e; for s in $(COCO_SUBSETS); do \
+	  z1="$(COCO_ROOT)/$${s}.zip"; z2="$(COCO_ROOT)/downloads/$${s}.zip"; \
+	  if [ -f "$$z1" ]; then echo "[i] Unzipping $$z1"; unzip -n -q "$$z1" -d "$(COCO_ROOT)"; \
+	  elif [ -f "$$z2" ]; then echo "[i] Unzipping $$z2"; unzip -n -q "$$z2" -d "$(COCO_ROOT)"; \
+	  else echo "[w] Zip for subset $$s not found (looked at $$z1 and $$z2)"; fi; \
+	done; echo "[i] Extraction complete"
+
+# Remove engines, calibration subset, latency / map / layer coverage artifacts (keeps venv & dataset)
+reset-edge:
+	@echo "[i] Resetting edge artifacts under $(EDGE_ROOT) (keeping dataset & venv)"
+	@rm -rf $(EDGE_ROOT)/calib_images || true
+	@rm -f $(EDGE_ROOT)/detector_latency_rpi5_*_*.json || true
+	@rm -f $(EDGE_ROOT)/latency_comparative_*.csv || true
+	@rm -f $(EDGE_ROOT)/map_metrics_*_*.json || true
+	@rm -rf $(EDGE_ROOT)/results/figures || true
+	@echo "[i] Edge artifacts cleared"
+
+# Full clean: everything (ENGINES, venv, results) EXCEPT COCO dataset unless FULL_DATA=1
+FULL_DATA ?= 0
+full-clean:
+	@echo "[i] Full clean (EDGE_ROOT=$(EDGE_ROOT)) preserve COCO dataset (FULL_DATA=$(FULL_DATA))"
+	@rm -rf $(EDGE_ROOT)/detector_latency_rpi5_*_*.json $(EDGE_ROOT)/latency_comparative_*.csv $(EDGE_ROOT)/map_metrics_*_*.json || true
+	@rm -rf $(EDGE_ROOT)/calib_images $(EDGE_ROOT)/results || true
+	@if [ -d $(EDGE_ROOT)/.venv ]; then rm -rf $(EDGE_ROOT)/.venv; fi
+	@if [ "$(FULL_DATA)" = "1" ]; then echo "[i] Removing COCO dataset at $(COCO_ROOT)"; rm -rf $(COCO_ROOT); fi
+	@echo "[i] Full clean complete"
+
+.PHONY += coco-extract reset-edge full-clean

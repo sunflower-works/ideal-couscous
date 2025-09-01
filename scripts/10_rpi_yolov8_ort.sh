@@ -5,7 +5,7 @@
 set -euo pipefail
 QUIET_MODE="${QUIET:-0}"
 ROOT="${1:-$HOME/edge-yolo}"
-INPUT_SIZE="${2:-320}"
+INPUT_SIZE="${2:-480}"
 OUT_SUFFIX="${OUT_SUFFIX:-}"
 WARMUP="${WARMUP:-20}"
 ITERS="${ITERS:-200}"

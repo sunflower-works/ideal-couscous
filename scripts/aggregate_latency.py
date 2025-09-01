@@ -20,6 +20,7 @@ def parse_file(path):
         data = json.load(f)
     summ = data.get("summary", {})
     fname = os.path.basename(path)
+
     # Extract device, imgsz, precision (ignore optional suffix like _t1)
     m = re.match(
         r"detector_latency_(?P<device>[^_]+)_(?P<imgsz>\d+)_(?P<precision>[a-z0-9_]+)(?:_.*)?\.json",
@@ -41,22 +42,12 @@ def parse_file(path):
         "p50_ms": float(summ.get("p50_ms", 0)),
         "p95_ms": float(summ.get("p95_ms", 0)),
     }
-    # Optional temperature fields
-    for k in ("temp_c_min", "temp_c_avg", "temp_c_max"):
-        v = summ.get(k)
-        if v is not None:
-            try:
-                out[k] = float(v)
-            except Exception:
-                pass
-    return out
-
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--glob", default="detector_latency_*.json")
     ap.add_argument("--out", default="latency_comparative.csv")
-    args = ap.parse_args()
+
     files = []
     for path in glob.glob(args.glob):
         r = parse_file(path)

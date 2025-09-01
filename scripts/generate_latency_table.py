@@ -59,14 +59,16 @@ def build_table(device, size, rows, caption_base, label_base):
     lines.append("\\begin{table}[h]")
     lines.append("\\centering")
     lines.append("\\small")
-    col_spec = "l" + "r"*(len(HEADER_ORDER)-1)
+    col_spec = "l" + "r" * (len(HEADER_ORDER) - 1)
     lines.append(f"\\begin{{tabular}}{{{col_spec}}}")
     lines.append("\\toprule")
-    lines.append(" ".join([HEADER_LABELS[h] for h in HEADER_ORDER]).replace(" ", " & ") + " \\\")
+    header = " ".join(HEADER_LABELS[h] for h in HEADER_ORDER).replace(" ", " & ") + " \\\\"
+    lines.append(header)
     lines.append("\\midrule")
     for r in rows_sorted:
-        line = " & ".join(fmt(r.get(h)) for h in HEADER_ORDER) + " \\\")
-        lines.append(line)
+        row_line = " & ".join(fmt(r.get(h)) for h in HEADER_ORDER) + " \\\\" 
+        lines.append(row_line)
+
     lines.append("\\bottomrule")
     lines.append("\\end{tabular}")
     cap = f"{caption_base} (device={device}, {size}px)"

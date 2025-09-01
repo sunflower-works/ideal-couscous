@@ -1,3 +1,4 @@
+
 # Python caches and virtualenvs
 __pycache__/
 *.py[cod]
@@ -12,6 +13,8 @@ ENV/
 # IDE/editor
 .vscode/
 .idea/
+*.iml
+
 
 # LaTeX build artifacts
 *.aux
@@ -20,26 +23,40 @@ ENV/
 *.blg
 *.fdb_latexmk
 *.fls
-*.glg
-*.glo
-*.gls
-*.ist
 *.lof
 *.log
 *.lot
 *.out
+*.synctex(busy)
+*.synctex.gz
+*.toc
+*.glg
+*.glo
+*.gls
+*.ist
 *.run.xml
 *.toc
 *.wmidx
 *.xwm
 _minted/
 
+# Jupyter
+.ipynb_checkpoints/
+
+# Generated results/artifacts (adjust if you want them tracked)
+# results/
+
+# Tool-generated figures
+toolset/figures/*_generated*
+
+# OS
+.DS_Store
+Thumbs.db
 # Generated PDFs (keep sources in .tex)
 thesis*.pdf
 poster.pdf
 
 # Repo outputs and generated content
-results/
 toolset/figures/*generated*
 toolset/unified/
 toolset/pi_suite/mini_test/
