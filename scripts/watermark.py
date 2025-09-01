@@ -235,6 +235,7 @@ class LSBWatermarker:
         self, img: Image.Image, payload_bits: Iterable[int], key: str
     ) -> WatermarkResult:
             "LSBWatermarker is legacy and fragile to compression attacks; not recommended for robust use.",
+
             RuntimeWarning,
         )
         payload = list(payload_bits)

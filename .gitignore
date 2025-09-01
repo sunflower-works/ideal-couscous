@@ -1,15 +1,20 @@
-# Python
+
+# Python caches and virtualenvs
 __pycache__/
 *.py[cod]
 *.pyo
+*.pyd
 *.so
+*.egg-info/
 .venv/
-.env
+venv/
+ENV/
 
 # IDE/editor
 .vscode/
 .idea/
 *.iml
+
 
 # LaTeX build artifacts
 *.aux
@@ -29,6 +34,8 @@ __pycache__/
 *.glo
 *.gls
 *.ist
+*.run.xml
+*.toc
 *.wmidx
 *.xwm
 _minted/
@@ -37,7 +44,7 @@ _minted/
 .ipynb_checkpoints/
 
 # Generated results/artifacts (adjust if you want them tracked)
-results/
+# results/
 
 # Tool-generated figures
 toolset/figures/*_generated*
@@ -45,3 +52,23 @@ toolset/figures/*_generated*
 # OS
 .DS_Store
 Thumbs.db
+# Generated PDFs (keep sources in .tex)
+thesis*.pdf
+poster.pdf
+
+# Repo outputs and generated content
+toolset/figures/*generated*
+toolset/unified/
+toolset/pi_suite/mini_test/
+
+# Misc
+.DS_Store
+Thumbs.db
+
+# Local logs
+orin-logs.txt
+scripts/stab.sh
+thesis.bcf-SAVE-ERROR
+assessment.txt
+.idea/report.iml
+.idea/inspectionProfiles/Project_Default.xml

@@ -35,6 +35,7 @@ cd "$ROOT"
 PYTHON=${PYTHON:-python3}
 MODEL=${MODEL:-yolov8n.pt}
 
+
 case "$PRECISION" in
   fp32|fp16|int8) ;;
   fp8|fp4) echo "[e] Unsupported precision $PRECISION on this device." >&2; exit 2;;
@@ -59,6 +60,7 @@ if ! command -v "$TRTEXEC" >/dev/null 2>&1 && [ ! -x "$TRTEXEC" ]; then
 fi
 
 TRT_HELP=$("$TRTEXEC" --help 2>/dev/null || true)
+
 if echo "$TRT_HELP" | grep -q -- '--memPoolSize'; then
   TRT_NEW_API=1
 else
@@ -75,6 +77,7 @@ for f in "${HELPERS[@]}"; do
     echo "[i] Synced $f from scripts dir"
   else
     [ -f "$f" ] || echo "[w] Helper $f not found locally or in script dir"
+
   fi
 done
 
@@ -93,7 +96,6 @@ if [ "$PRECISION" = int8 ] && [ -z "$CALIB_DIR" ] && [ -n "$AUTO_CALIB_COCO_ROOT
   CALIB_DIR="$AUTO_CALIB_OUT"
 fi
 
-# Derive a consistent stem for artifacts (keep yolov8n_... filenames for compatibility by default)
 STEM=$(basename "$MODEL")
 STEM="${STEM%.*}"  # drop extension
 OUT_ONNX="${STEM}_${INPUT_SIZE}.onnx"
@@ -101,6 +103,7 @@ $PYTHON export_model.py --model "$MODEL" --imgsz "$INPUT_SIZE" --out "$OUT_ONNX"
 
 ONNX_RAW="$OUT_ONNX"
 ONNX_SIM="${STEM}_${INPUT_SIZE}_sim.onnx"
+
 if $PYTHON -c 'import onnxsim' 2>/dev/null; then
   echo "[i] Simplifying ONNX"
   $PYTHON - <<PY "$ONNX_RAW" "$ONNX_SIM"
@@ -118,6 +121,7 @@ fi
 ONNX="$ONNX_SIM"
 # Keep engine filename pattern stable for downstream aggregation
 ENGINE="${STEM}_${INPUT_SIZE}_${PRECISION}.engine"
+
 
 PY_TRT=0
 if $PYTHON - <<'PY'
@@ -144,6 +148,7 @@ if [ "$PRECISION" = int8 ] && [ $PY_TRT -eq 1 ] && [ ! -f "$ENGINE" ] && [ -z "$
   fi
 elif [ "$PRECISION" = int8 ] && [ $PY_TRT -ne 1 ] && [ -n "$CALIB_DIR" ]; then
   echo "[w] Python TensorRT not available; skipping Python calibrator. Building INT8 with trtexec (may require existing calib cache or fallback)."
+
 fi
 
 if [ ! -f "$ENGINE" ]; then
@@ -160,6 +165,7 @@ if [ ! -f "$ENGINE" ]; then
       # Allow mixed precision kernels for performance (TRT will pick best)
       [ $TRT_NEW_API -eq 1 ] && BUILD_ARGS+=( --best ) || true
   [ -n "$CALIB_CACHE" ] && BUILD_ARGS+=( --calib="$CALIB_CACHE" )
+
       ;;
   esac
   if [ $TRT_NEW_API -eq 1 ]; then
@@ -169,6 +175,7 @@ if [ ! -f "$ENGINE" ]; then
   fi
   echo "[i] $TRTEXEC ${BUILD_ARGS[*]}" | tee -a "$BUILD_LOG"
   if ! "$TRTEXEC" "${BUILD_ARGS[@]}" 2>&1 | tee -a "$BUILD_LOG"; then
+
     echo "[e] trtexec build failed" >&2; exit 1
   fi
 else

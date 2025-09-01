@@ -29,6 +29,7 @@ FORCE_REBUILD="${FORCE_REBUILD:-0}"
 SKIP_INT8="${SKIP_INT8:-0}"
 EXTRA_PRECS="${EXTRA_PRECS:-fp32 fp16 int8}"
 MODEL="${MODEL:-yolov8n.pt}"
+
 TS=$(date +%Y%m%d_%H%M%S)
 MASTER_LOG="$LOG_DIR/batch_${IMG_SIZE}_${TS}.log"
 exec > >(tee -a "$MASTER_LOG") 2>&1
@@ -62,11 +63,13 @@ for PREC in "${RUN_PRECS[@]}"; do
   echo "[i] === Phase: $PREC ==="
   STEM=$(basename "$MODEL"); STEM="${STEM%.*}"
   ENGINE="${STEM}_${IMG_SIZE}_${PREC}.engine"
+
   if [ -f "$ENGINE" ] && [ "$FORCE_REBUILD" != 1 ]; then
     echo "[i] Existing engine $ENGINE (reuse). Use FORCE_REBUILD=1 to rebuild."
   fi
   PRECISION=$PREC WARMUP=$WARMUP ITERS=$ITERS WORKSPACE_MB=$WORKSPACE_MB \
     CALIB_DIR="$CALIB_DIR" CALIB_SAMPLES=$CALIB_SAMPLES CALIB_BATCH=$CALIB_BATCH MODEL="$MODEL" \
+
     bash "$SCRIPT_DIR/10_jetson_yolov8_trt.sh" "$ROOT" "$IMG_SIZE" || { echo "[e] Phase $PREC failed"; PHASE_OK=0; break; }
   echo "[i] Phase $PREC done"
   echo

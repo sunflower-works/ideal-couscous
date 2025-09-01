@@ -18,6 +18,7 @@ import cv2 as cv
 import numpy as np
 import subprocess
 
+
 try:
     import tensorrt as trt
 except Exception as e:  # pragma: no cover
@@ -48,7 +49,6 @@ def _trt_ge(major: int, minor: int = 0) -> bool:
         return tuple(parts) >= (major, minor, 0)
     except Exception:
         return False
-
 
 def letterbox(img, size, color=(114, 114, 114)):
     h, w = img.shape[:2]
@@ -346,6 +346,7 @@ def build_int8(
     except Exception as e:
         print(f"[e] PTQ fallback failed: {e}", file=sys.stderr)
     raise SystemExit("[e] Engine build failed (serialized network is None)")
+
 
 
 def main():

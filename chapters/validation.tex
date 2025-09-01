@@ -1,11 +1,24 @@
 \chapter{Experimental Validation (RTC CNN on Edge Vertices)}
 \label{ch:exp}
 
-This chapter validates the watermarking system under real-time computing (RTC) constraints on edge-computing vertices (camera → SoC/accelerator → network → verifier).
-The emphasis is on end-to-end latency, robustness, and stability of a CNN-driven runtime pipeline deployed on low-power devices.
-Unless stated, experiments use the 10\,000-image corpus described in Chapter~\ref{ch:methodology}.
-The transform-layer algorithm in ablations is \texttt{dwt\_svd} (Section~\ref{sec:implementation}); \texttt{dct\_parity} serves as a lightweight control, and \texttt{dwt\_svd\_adv} as an adversarially profiled variant.
+% Fallbacks for optionally generated macros (safe no-ops if already defined)
+\providecommand{\detInferMeanMsJetson}{--}
+\providecommand{\detInferMeanMsPi}{--}
+\providecommand{\embedMeanMs}{--}
+\providecommand{\embedSdMs}{--}
+\providecommand{\extractMeanMs}{--}
+\providecommand{\extractSdMs}{--}
+\providecommand{\accJPEGtwenty}{--}
+\providecommand{\accJPEGseventy}{--}
+\providecommand{\accJPEGninety}{--}
+\providecommand{\confirmMedian}{--}
+\providecommand{\confirmPninety}{--}
+\providecommand{\confirmPctAdd}{--}
+\providecommand{\defaultseed}{0}
 
+This chapter validates the watermarking system under real-time computing (RTC) constraints on edge-computing vertices (camera → SoC/accelerator → network → verifier). The emphasis is on end-to-end latency, robustness, and stability of a CNN-driven runtime pipeline deployed on low-power devices. Unless stated, experiments use the 10\,000-image corpus described in Chapter~\ref{ch:methodology}. The transform-layer algorithm in ablations is \texttt{dwt\_svd} (Section~\ref{sec:implementation}); \texttt{dct\_parity} serves as a lightweight control, and \texttt{dwt\_svd\_adv} as an adversarially profiled variant.
+
+% ------------------------------------------------------------------
 \section{Edge RTC Vertices and Pipeline}
 \label{sec:validation:pipeline}
 
@@ -19,9 +32,7 @@ We decompose the RTC path into vertices with strict timing budgets:
     \item Anchor/Attest (optional on-chain digest)
 \end{enumerate}
 
-The CNN stage implements a fast binary verifier that scores the plausibility of a valid watermark under current content statistics (blur, texture, compression history).
-The detector operates in real time on-device (Jetson/Raspberry Pi) and enables per-frame accept/retry decisions without cloud offloading.
-To ground these vertices in the broader system, the capture/transform details follow Chapter~\ref{ch:methodology}, while algorithmic choices for the frequency-domain layer (and their parameters) follow Section~\ref{sec:implementation}.
+The CNN stage implements a fast binary verifier that scores the plausibility of a valid watermark under current content statistics (blur, texture, compression history). The detector operates in real time on-device (Jetson/Raspberry Pi) and enables per-frame accept/retry decisions without cloud offloading. Capture/transform details follow Chapter~\ref{ch:methodology}; algorithmic choices for the frequency-domain layer follow Section~\ref{sec:implementation}.
 
 \keytakeaway{The RTC constraint is enforced at each vertex; the CNN verifier runs inline to gate extraction and reduce false positives at the edge.}
 
@@ -36,10 +47,10 @@ Hardware vertices:
     \item Optional NPU/TPU where available for the CNN stage.
 \end{itemize}
 
-RTC objective (per-frame budget): maintain median latency well below 250\,ms for end-to-end watermark handling on-device. We report:
+RTC objective (per-frame budget): keep median latency well below 250\,ms for end-to-end watermark handling on-device. We report:
 \begin{itemize}
     \item Embed/Extract latency distribution (baseline and runtime groups).
-    \item \gls{cnn} inference latency and stability (discussed qualitatively when numerical macros are unavailable).
+    \item \gls{cnn} inference latency and stability.
     \item Anchoring overhead where enabled.
 \end{itemize}
 
@@ -47,41 +58,29 @@ RTC objective (per-frame budget): maintain median latency well below 250\,ms for
 \section{YOLOv8n Setup and CNN Inference (Edge)}
 \label{sec:validation:yolov8n-setup}
 
-This section documents the end-to-end procedure for deploying and benchmarking a YOLOv8n detector that provides ROI-aware guidance and acceptance gating in the RTC pipeline.
-
-\subsection{Model export and runtimes}
-\label{sec:validation:yolov8n-export}
+\textbf{Model export and runtimes.}
 \begin{itemize}
   \item Backbone: \textbf{YOLOv8n} (detection or segmentation head, depending on masking needs).
   \item Export: ONNX with static input shape (e.g., \(1\times3\times416\times416\)).
-  \item Jetson runtime: TensorRT FP16 engine; INT8 optional with calibrated dataset representative of on-device scenes.
-  \item Raspberry Pi 5 runtime: ONNX Runtime or OpenVINO with INT8 Q/DQ; prefer fused post-processing (letterbox + NMS) to minimise host overhead.
+  \item Jetson runtime: TensorRT FP16 engine; INT8 optional with calibrated on-device scenes.
+  \item Raspberry Pi 5 runtime: ONNX Runtime or OpenVINO (CPU); prefer fused post-processing (letterbox + NMS) to minimise host overhead.
 \end{itemize}
 
-\subsection{Inference policy (cadence and resolution)}
-\label{sec:validation:yolov8n-policy}
+\textbf{Inference policy (cadence and resolution).}
 We tune input size and cadence to preserve the 250\,ms per-frame budget for \emph{embed+extract+detect}:
 \begin{itemize}
-  \item Jetson Orin Nano: \(416\) px input, detector invoked every 2 frames (\emph{async} stream); median detector latency \(\approx\)\detInferMeanMsJetson\,ms.
-  \item Raspberry Pi 5: \(320\) px input, detector invoked every 3–5 frames (\emph{sync} call after extract); median detector latency \(\approx\)\detInferMeanMsPi\,ms.
+  \item Jetson Orin Nano: \(416\) px input, detector every 2 frames (\emph{async} stream); median detector latency \(\approx\)\detInferMeanMsJetson\,ms.
+  \item Raspberry Pi 5: \(320\) px input, detector every 3–5 frames (\emph{sync} call after extract); median detector latency \(\approx\)\detInferMeanMsPi\,ms.
   \item If end-to-end p95 approaches the budget, the controller reduces detector input size or cadence adaptively.
 \end{itemize}
 
-\subsection{Calibration and quantisation}
-\label{sec:validation:yolov8n-quant}
-\begin{itemize}
-  \item INT8 calibration uses a stratified sample of on-device frames spanning blur, texture, and illumination conditions.
-  \item Segmentation-driven masking (if used) is validated post-quantisation to check boundary stability at reduced precision.
-\end{itemize}
-
-\subsection{Logged metrics and artefacts}
-\label{sec:validation:yolov8n-metrics}
-For each frame, the pipeline logs: detector inference time (\texttt{detector\_infer\_ms}), confidence (\texttt{detector\_score}), decision (\texttt{detector\_flag}), and the effective input size (\texttt{detector\_input\_px}). When segmentation is enabled, \texttt{masked\_area\_\%} quantifies how much of the frame is down-weighted.
-
-We surface detector latency in the text via macros (\verb+\detInferMeanMsJetson+, \verb+\detInferMeanMsPi+) and include the optional latency table if generated:
+\textbf{Logged metrics and artefacts.}
+Per frame, the pipeline logs \texttt{detector\_infer\_ms}, \texttt{detector\_score}, \texttt{detector\_flag}, \texttt{detector\_input\_px}, and (if segmentation is enabled) \texttt{masked\_area\_\%}. We surface detector latency via macros (\verb+\detInferMeanMsJetson+, \verb+\detInferMeanMsPi+) and include the optional latency table if generated:
 \IfFileExists{toolset/figures/detector_latency_generated.tex}{%
   \input{toolset/figures/detector_latency_generated.tex}%
-}{}
+}{%
+  \noindent\textit{Detector latency (median): Jetson \detInferMeanMsJetson~ms;\; Raspberry~Pi~5 \detInferMeanMsPi~ms.}
+}
 
 \keytakeaway{YOLOv8n is scheduled at reduced cadence and resolution to preserve the RTC envelope while adding semantic guidance for robust, content-aware watermarking.}
 
@@ -89,25 +88,23 @@ We surface detector latency in the text via macros (\verb+\detInferMeanMsJetson+
 \section{Latency (End-to-End)}
 \label{sec:validation:latency}
 
-Latency is measured as \(t_{\text{end}}-t_{\text{start}}\) across embed/extract vertices, with CNN verifier evaluated inline post-extract. Where generated, we include the measured table; otherwise, macros provide summary values.
+Latency is measured as \(t_{\text{end}}-t_{\text{start}}\) across embed/extract vertices, with the CNN verifier evaluated inline post-extract. Where generated, we include the measured table; otherwise, macros provide summary values.
 
 \IfFileExists{toolset/figures/latency_table_generated.tex}{%
-    \input{toolset/figures/latency_table_generated}% includes its own label
+    \input{toolset/figures/latency_table_generated.tex}% includes its own label
 }{%
     \begin{table}[ht]
         \centering
         \caption{Latency (mean $\pm$ SD over $n$ runs).}
         \label{tab:latency}
-        \begin{tabular}{|l|c|c|}
+        \begin{tabular}{|l|c|}
             \hline
-            \textbf{Stage} & \textbf{Measured (ms)} & \textbf{Target (ms)} \\ \hline
-            Embed (Edge)  & \embedMeanMs(\embedSdMs) & 250 \\ \hline
-            Extract (Edge) & \extractMeanMs(\extractSdMs) & 300 \\ \hline
+            \textbf{Stage} & \textbf{Measured (ms)} \\ \hline
+            Embed (Edge)  & \embedMeanMs(\embedSdMs) \\ \hline
+            Extract (Edge) & \extractMeanMs(\extractSdMs) \\ \hline
         \end{tabular}
     \end{table}
 }
-
-Qualitatively, the \gls{cnn} verifier is designed to remain sub-frame: depthwise-lightweight with fixed input resolution; on Jetson-class devices it runs within the residual budget after extraction without exceeding the 250\,ms envelope. On CPU-only Pi-class devices, the verifier executes with reduced batch size and simplified activation schedule to keep p95 under the budget when background load is present.
 
 \keytakeaway{Median embed/extract latency remains within real-time bounds; the CNN verifier does not push the system over the RTC threshold on either device class.}
 
@@ -115,138 +112,69 @@ Qualitatively, the \gls{cnn} verifier is designed to remain sub-frame: depthwise
 \section{Robustness Under Content Transformations}
 \label{sec:validation:robustness}
 
-Robustness is evaluated under:
-\begin{itemize}
-    \item JPEG compression with quality factors in \(\{10,\dots,100\}\%\).
-    \item Mild geometric transforms (small rotations and scales).
-    \item Additive Gaussian noise (\(\sigma\) grid).
-\end{itemize}
-
-Accuracy is defined as \(\mathrm{ACC}=100-\mathrm{BER}(\%)\).
-If available, we input the generated JPEG sweep figure:
+Robustness is evaluated under JPEG compression (\(10\)–\(100\)\,\%), mild geometric transforms (small rotations/scales), and additive Gaussian noise (\(\sigma\) grid). Accuracy is \(\mathrm{ACC}=100-\mathrm{BER}(\%)\).
 
 \begin{figure}[htbp]
     \centering
-    \IfFileExists{toolset/figures/accuracy_jpeg_generated.tikz}{\input{toolset/figures/accuracy_jpeg_generated}}{}
+    \IfFileExists{toolset/figures/accuracy_jpeg_generated.tikz}{\input{toolset/figures/accuracy_jpeg_generated.tikz}}{}
     \caption[Extraction accuracy vs JPEG]{Extraction accuracy under varying JPEG compression (mean across runs).}
     \label{fig:accuracy_jpeg}
 \end{figure}
 
-When macros are present, the target points are summarized by accuracy macros (e.g., \texttt{\textbackslash accJPEGtwenty}, \texttt{\textbackslash accJPEGseventy}, \texttt{\textbackslash accJPEGninety}). We report these as the contractual robustness checkpoints in lieu of hard-coded claims to remain consistent with measured data.
 \IfFileExists{toolset/metrics_macros.tex}{%
 \par\noindent\textit{Checkpoint accuracies (mean):}%
 \;Q20=\accJPEGtwenty\%\,,\;Q70=\accJPEGseventy\%\,,\;Q90=\accJPEGninety\%.
-}{}
+}
 
-\keytakeaway{Measured robustness across JPEG qualities is reported directly from generated metrics/macros, ensuring the narrative matches analysis outputs.}
+\keytakeaway{Reported robustness across JPEG qualities is sourced directly from generated metrics/macros, ensuring narrative–data consistency.}
 
 % ------------------------------------------------------------------
 \section{CNN Verifier: RTC Characteristics}
 \label{sec:validation:cnn}
 
-The edge CNN verifier enforces temporal consistency and reduces false positives by learning content-conditioned acceptance. Design choices for RTC:
+Design choices for the edge verifier:
 \begin{itemize}
     \item Lightweight backbone (e.g., depthwise separable convs) at fixed input size.
     \item Quantization-aware training or INT8 post-training quantization when NPU/TPU is present.
     \item Single-pass inference per frame; no ensembling or multi-crop at the edge.
 \end{itemize}
 
-Observed behavior under RTC:
+Observed behavior:
 \begin{itemize}
-    \item Stable inference latency on Jetson-class devices with GPU scheduling coexisting with frequency-domain extraction.
-    \item On CPU-only devices, inference is scheduled after extraction and before handoff, preserving the median end-to-end budget.
-    \item Detector score is negatively correlated with over-blur; this aligns with the analysis feature \emph{image\_blur\_metric} used for stratified slicing.
+    \item Stable inference latency on Jetson-class devices coexisting with frequency-domain extraction.
+    \item On CPU-only devices, inference follows extraction, preserving the median end-to-end budget.
+    \item Detector score correlates negatively with over-blur; aligns with \emph{image\_blur\_metric} for stratified slicing.
 \end{itemize}
 
-For architectural and training details of the verifier and frequency-domain modules, see Section~\ref{sec:implementation}.
-
-\keytakeaway{A compact CNN verifier fits within the per-frame residual budget and improves decision quality at the edge without cloud dependency.}
-
-% ---------------------------- NEW: YOLOv8 subsection ----------------------------
-% ---------------------------- IMPROVED: YOLOv8 subsection ----------------------------
-\subsection{YOLOv8 for ROI-Aware RTC Watermarking}
-\label{sec:validation:yolov8}
-
-\textbf{Motivation.}
-Classical frequency-domain watermarks are blind to semantic content.
-A fast object detector lets us (\emph{i}) down-weight or mask sensitive regions (faces, logos),
-(\emph{ii}) steer payload strength toward textured backgrounds, and
-(\emph{iii}) skip extraction on obviously irrelevant frames.
-YOLOv8n offers the best latency–accuracy trade-off for this role.
-
-\paragraph{Detector policy.}
-The detector cadence and resolution are dynamically chosen to keep the combined
-\emph{embed+extract+detect} latency below the 250 ms per-frame budget.
-
-\begin{table}[ht]
-    \centering
-    \caption{YOLOv8 deployment policy on target edge devices.}
-    \label{tab:yolo_policy}
-    \begin{tabular}{|l|c|c|c|c|}
-        \hline
-        \textbf{Device} & \textbf{Backend} & \textbf{Input px} & \textbf{Cadence (frames)} & \textbf{Median\,ms} \\ \hline
-        Jetson Orin Nano & TensorRT FP16 & 416 & 2 & \detInferMeanMsJetson \\ \hline
-        Raspberry Pi 5   & ORT INT8       & 320 & 3–5 & \detInferMeanMsPi \\ \hline
-    \end{tabular}
-\end{table}
-
-\paragraph{Optional latency artefact.}
-If the analysis pipeline exports \texttt{toolset/figures/detector\_latency\_generated.tex}
-we include it automatically:
-
-\IfFileExists{toolset/figures/detector_latency_generated.tex}{%
-    \input{toolset/figures/detector_latency_generated.tex}%
-}{}   % <— empty else branch prevents “file not found” error
+\keytakeaway{A compact CNN verifier fits the per-frame residual budget and improves decision quality at the edge without cloud dependency.}
 
 % ------------------------------------------------------------------
-% Ensure detector-latency macros always exist, even before analysis run
-\providecommand{\detInferMeanMsJetson}{--}
-\providecommand{\detInferMeanMsPi}{--}
+\subsection{Edge Inference Summary}
+\label{sec:validation:edge-summary}
 
-\paragraph{Implementation notes.}
-\begin{itemize}
-    \item Models exported to ONNX with static shapes; TensorRT / OpenVINO INT8 engines are built offline.
-    \item Letter-box padding and NMS are fused into the network to shave $\approx$20 \% host CPU time.
-    \item ROIs are cached and linearly interpolated between detections to avoid running YOLO every frame.
-\end{itemize}
+\paragraph{Jetson Orin.}
+\IfFileExists{results/figures/edge_inference_report_jetson_480.tex}{%
+    \input{results/figures/edge_inference_report_jetson_480}%
+}{%
+\IfFileExists{results/figures/edge_inference_report_jetson.tex}{%
+    \input{results/figures/edge_inference_report_jetson}%
+}{\emph{Jetson edge inference report not yet generated.}}}
 
-\paragraph{Logged metrics.}
-The unified CSV schema already stores
-\texttt{detector\_infer\_ms}, \texttt{detector\_score}, \texttt{detector\_flag},
-and \texttt{masked\_area\_\%}.
-Macros \verb+\detInferMeanMsJetson+ and \verb+\detInferMeanMsPi+ are emitted by
-\texttt{unified_analysis.py}; if absent, numeric claims are suppressed.
+\paragraph{Raspberry Pi 5.}
+\IfFileExists{results/figures/edge_inference_report.tex}{%
+    \input{results/figures/edge_inference_report}%
+}{\emph{RPi edge inference report not yet generated.}}
 
-\keytakeaway{YOLOv8n, invoked at adaptive cadence, adds semantic
-awareness to the watermark while staying within the RTC envelope.}
-
-\section{Anchoring Overhead (Optional)}
-\label{sec:validation:anchoring}
-
-Digest anchoring is optional and executed off the critical path by default; enabling synchronous confirmation is a configurable mode for specific deployments. If generated, we include the anchoring cost plot:
-
-\begin{figure}[ht]
-  \centering
-  \IfFileExists{toolset/figures/anchoring_cost_generated.tikz}{\input{toolset/figures/anchoring_cost_generated}}{}
-  \caption{Digest anchoring fee vs batch size.}
-  \label{fig:anchoring_cost}
-\end{figure}
-
-Where confirmation latency macros are available, we summarize the overhead:
-\[
-\tilde t_{\text{confirm}}=\confirmMedian\,\text{s} \quad (\text{p90: } \confirmPninety\,\text{s}), \quad
-\text{<}\confirmPctAdd\% \text{ of end-to-end.}
-\]
-If macros are unavailable, we omit numeric claims to avoid divergence from measured data.
+\noindent\textit{Interpretation.} Prefer the faster backend as shown in the generated edge inference tables; keep detector cadence and resolution adaptive to meet thermal and latency budgets.
 
 % ------------------------------------------------------------------
+\IfFileExists{toolset/unified/unified_payload_table_generated.tex}{%
 \section{Payload Capacity and Recovery}
 \label{sec:validation:payload}
 
-Aggregate embedding/recovery performance (latest benchmark run) is summarized below. This table is auto-generated by the unified analysis pipeline and reflects the active algorithms on the latest run.
-\IfFileExists{toolset/unified/unified_payload_table_generated.tex}{%
-    \input{toolset/unified/unified_payload_table_generated}%
-}{\textit{Unified payload metrics table not yet generated (run `make analyze` after producing benchmark CSVs).}}
+Aggregate embedding/recovery performance (latest run) is summarised below; the table is auto-generated by the analysis pipeline.
+\input{toolset/unified/unified_payload_table_generated}
+}
 
 % ------------------------------------------------------------------
 \section{Summary Against RTC Objectives}
@@ -255,9 +183,9 @@ Aggregate embedding/recovery performance (latest benchmark run) is summarized be
 The system meets RTC constraints across edge vertices, with data-driven claims tied to generated metrics:
 \begin{itemize}
     \item Latency: embed/extract medians and p95 within budget (Table~\ref{tab:latency}); CNN verifier remains sub-frame on both device classes.
-    \item Robustness: JPEG accuracy reported from generated metrics/macros at standard quality points (Figure~\ref{fig:accuracy_jpeg}).
-    \item Capacity/Recovery: summarized per algorithm via the unified table.
-    \item Anchoring: overhead and fee scaling are separated from the critical path; batch sizing can be tuned with the provided curve.
+    \item Robustness: JPEG accuracy reported from generated macros at standard quality points (Figure~\ref{fig:accuracy_jpeg}).
+    \item Capacity/Recovery: summarised per algorithm via the unified table (if present).
+    \item Anchoring: overhead and fee scaling are optional and off the critical path; batch sizing can be tuned with the provided curve.
 \end{itemize}
 
-\paragraph{Reproducibility.} Run: \texttt{./run\_pi\_suite.sh --seed \defaultseed --git <short-hash>} followed by \texttt{make analyze} to regenerate tables, macros, and figures consumed by this chapter.
+\paragraph{Reproducibility.} Run: \texttt{./run\_pi\_suite.sh --seed \defaultseed --git <short-hash>} then \texttt{make analyze} to regenerate tables, macros, and figures consumed by this chapter.

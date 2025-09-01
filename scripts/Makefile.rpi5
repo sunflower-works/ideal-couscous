@@ -9,6 +9,7 @@ SHELL := /bin/bash
 # Defaults
 EDGE_ROOT ?= $(HOME)/edge-yolo
 IMG_SIZE ?= 480
+
 WARMUP ?= 20
 ITERS ?= 200
 CALIB_COUNT ?= 256
@@ -30,7 +31,7 @@ endif
 
 # Output controls
 DRY_RUN ?= 0                 # 1=print commands without executing
-QUIET ?= 1                   # 1=less verbose output
+QUIET ?= 0                   # 1=less verbose output
 # Helper to toggle execution vs print; prefix with @ to avoid make's own echo
 RUN := $(if $(filter 1,$(DRY_RUN)),echo ,)
 AT := @
@@ -45,7 +46,7 @@ PROJECT_RESULTS := $(PROJECT_ROOT)/results/figures
 
 # Helper to ensure venv python (skip when DRY_RUN=1)
 define ensure_venv
-  if [ "$(DRY_RUN)" = "1" ]; then :; elif [ ! -x $(PY) ]; then \
+  if [ "$(strip $(DRY_RUN))" = "1" ]; then :; elif [ ! -x $(PY) ]; then \
     echo "[i] Python venv missing; run 'make -f Makefile.rpi5 env' first"; exit 2; fi
 endef
 
@@ -63,12 +64,12 @@ env:
 coco-download:
 	@echo "[i] COCO root: $(COCO_ROOT)  subsets: $(COCO_SUBSETS) tol=$(COCO_SIZE_TOL)% allow_larger=$(COCO_ALLOW_LARGER)"
 	$(AT)$(RUN)mkdir -p $(COCO_ROOT)
-	$(call ensure_venv)
+	@$(call ensure_venv)
 	$(AT)$(RUN)$(PY) $(SCRIPTS_DIR)/download_coco.py --output-dir $(COCO_ROOT) --subsets $(COCO_SUBSETS) \
 		--size-tolerance-pct $(COCO_SIZE_TOL) $(if $(filter 1,$(COCO_ALLOW_LARGER)),--allow-larger,) $(COCO_EXTRA)
 
 calib-subset:
-	$(call ensure_venv)
+	@$(call ensure_venv)
 	@echo "[i] Building calib subset -> $(EDGE_ROOT)/calib_images (N=$(CALIB_COUNT))"
 	$(AT)$(RUN)cd $(EDGE_ROOT)
 	$(AT)$(RUN)$(PY) $(SCRIPTS_DIR)/make_calib_subset.py --coco-root $(COCO_ROOT) --subsets $(CALIB_SUBSETS) \
@@ -77,6 +78,7 @@ calib-subset:
 # Single-precision ONNX Runtime CPU run on Raspberry Pi (writes detector_latency_rpi5_$(IMG_SIZE)_ort.json)
 bench:
 	$(call ensure_venv)
+
 	@echo "[i] Benchmarking on RPi5 ORT: IMG_SIZE=$(IMG_SIZE) WARMUP=$(WARMUP) ITERS=$(ITERS)"
 	$(AT)$(RUN)mkdir -p $(EDGE_ROOT)/logs
 	$(AT)$(RUN)cd $(EDGE_ROOT)

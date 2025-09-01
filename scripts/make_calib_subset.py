@@ -79,6 +79,7 @@ def main():
         action="store_true",
         help="If subset dir missing, try to unzip subset.zip from COCO root or downloads/",
     )
+
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
@@ -134,7 +135,9 @@ def main():
         if args.copy:
             if args.resize_max > 0:
                 try:
-                    print(f"[w] Failed to resize image {p.name}: {e}; falling back to direct copy")
+                    resize_if_needed(p, dst, args.resize_max)
+                except Exception as e:
+                    print(f"[w] resize failed for {p.name}: {e}; copying")
                     shutil.copy2(p, dst)
             else:
                 shutil.copy2(p, dst)

@@ -37,7 +37,8 @@ import json
 from pathlib import Path
 from typing import Dict, List
 
-PRECISION_ORDER = {"fp32": 0, "fp16": 1, "int8": 2}
+
+PRECISION_ORDER = {"fp32": 0, "fp16": 1, "int8": 2, "ort": 3, "ov": 4, "ov_int8": 5}
 
 LAT_HEADERS = [
     "precision",
@@ -45,7 +46,10 @@ LAT_HEADERS = [
     "p50_ms",
     "p95_ms",
     "fps_mean",
-    "speedup_vs_fp32",
+    "speedup",
+    "temp_c_min",
+    "temp_c_avg",
+    "temp_c_max",
 ]
 ACC_HEADERS = ["map50", "map50_95"]
 
@@ -64,6 +68,9 @@ def load_latency_csv(paths: List[Path], imgsz: int) -> Dict[str, Dict[str, str]]
                 except Exception:
                     continue
                 prec = row["precision"].lower()
+                # Normalize speedup header across generators
+                if "speedup" not in row and "speedup_vs_fp32" in row:
+                    row["speedup"] = row.get("speedup_vs_fp32", "")
                 data[prec] = row
     return data
 
@@ -88,21 +95,22 @@ def load_latency_from_json(pattern: str, imgsz: int) -> Dict[str, Dict[str, str]
                     if "mean_ms" in summ
                     else ""
                 ),
-                "speedup_vs_fp32": "",  # fill later
+                "speedup": "",  # fill later
             }
         except Exception:
             continue
     # Fill speedups if fp32 available
-    if "fp32" in out:
-        base = float(out["fp32"]["mean_ms"])
+    base_prec = "fp32" if "fp32" in out else ("ort" if "ort" in out else None)
+    if base_prec:
+        base = float(out[base_prec]["mean_ms"])
         for prec, row in out.items():
-            if prec == "fp32":
-                row["speedup_vs_fp32"] = "1.00"
+            if prec == base_prec:
+                row["speedup"] = "1.00"
             else:
                 try:
-                    row["speedup_vs_fp32"] = f"{base/float(row['mean_ms']):.2f}"
+                    row["speedup"] = f"{base/float(row['mean_ms']):.2f}"
                 except Exception:
-                    row["speedup_vs_fp32"] = ""
+                    row["speedup"] = ""
     return out
 
 
@@ -183,7 +191,10 @@ def latex_table(
         "p50_ms": "p50",
         "p95_ms": "p95",
         "fps_mean": "FPS",
-        "speedup_vs_fp32": "Speedup",
+        "speedup": "Speedup",
+        "temp_c_min": "Temp min (°C)",
+        "temp_c_avg": "Temp avg (°C)",
+        "temp_c_max": "Temp max (°C)",
         "map50": "mAP@0.5",
         "map50_95": "mAP@0.5:0.95",
     }
@@ -207,6 +218,50 @@ def latex_table(
     lines.append(f"\\caption{{{caption} (Device: {device}, {imgsz}px).{cap_extra}}}")
     lines.append(f"\\label{{{label}}}")
     lines.append("\\end{table}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def latex_textbox_keypoints(device: str, imgsz: int, rows: List[Dict[str, str]]) -> str:
+    # Extract OV and ORT if present
+    byp = {r.get("precision", "").lower(): r for r in rows}
+    ort = byp.get("ort")
+    ov = byp.get("ov") or byp.get("ov_int8")
+    if not (ort and ov):
+        return ""
+    # Build a small tcolorbox with bullets
+    try:
+        ov_sp = float(ov.get("speedup", "") or 0.0)
+        ov_mean = float(ov.get("mean_ms", "") or 0.0)
+        ort_mean = float(ort.get("mean_ms", "") or 0.0)
+        ov_tmax = ov.get("temp_c_max", "--")
+        ort_tmax = ort.get("temp_c_max", "--")
+    except Exception:
+        return ""
+    lines = []
+    lines.append("% Key points (auto-generated)")
+    lines.append("\\begin{tcolorbox}[title=Edge highlights, colback=gray!5,colframe=gray!40]")
+    lines.append(f"\\textbf{{Device}}: {device}, {imgsz}px\\\\")
+    lines.append("\\begin{itemize}")
+    if ov_mean < ort_mean:
+        # OV is faster than ORT
+        lines.append(
+            f"  \\item OpenVINO reduces mean latency from {ort_mean:.2f} ms to {ov_mean:.2f} ms (\\textbf{{{ov_sp:.2f}×}} vs ORT)."
+        )
+        lines.append(
+            "  \\item On this device, OV is the preferred CPU backend at this resolution."
+        )
+    else:
+        # OV is slower than ORT
+        # ov_sp here is speedup vs baseline (ORT). When OV is slower, ov_sp < 1.0
+        slowdown = (ort_mean / ov_mean) if ov_mean else 0.0
+        lines.append(
+            f"  \\item OpenVINO is slower than ORT at this setting: {ov_mean:.2f} ms vs {ort_mean:.2f} ms (\\textbf{{{ov_sp:.2f}×}} of ORT)."
+        )
+        lines.append("  \\item ORT remains the preferred CPU backend on RPi5 at this resolution.")
+    lines.append(f"  \\item Peak temperature: ORT {ort_tmax}°C vs OV {ov_tmax}°C.")
+    lines.append("\\end{itemize}")
+    lines.append("\\end{tcolorbox}")
     lines.append("")
     return "\n".join(lines)
 
@@ -251,9 +306,9 @@ def main():
     out_json.write_text(json.dumps(summary, indent=2))
 
     # LaTeX
-    tex_str = latex_table(
-        args.device, args.imgsz, rows, args.caption, args.label, int8_cov
-    )
+    tex_str = latex_table(args.device, args.imgsz, rows, args.caption, args.label, int8_cov)
+    # Append key points textbox for OV vs ORT narrative (if present)
+    tex_str = tex_str + "\n" + latex_textbox_keypoints(args.device, args.imgsz, rows)
     out_tex = Path(args.out_tex)
     out_tex.parent.mkdir(parents=True, exist_ok=True)
     out_tex.write_text(tex_str)

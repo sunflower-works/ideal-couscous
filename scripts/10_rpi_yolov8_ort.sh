@@ -6,6 +6,7 @@ set -euo pipefail
 QUIET_MODE="${QUIET:-0}"
 ROOT="${1:-$HOME/edge-yolo}"
 INPUT_SIZE="${2:-480}"
+OUT_SUFFIX="${OUT_SUFFIX:-}"
 WARMUP="${WARMUP:-20}"
 ITERS="${ITERS:-200}"
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
@@ -50,7 +51,7 @@ if [ "$QUIET_MODE" = "1" ]; then
     --imgsz "$INPUT_SIZE" \
     --warmup "$WARMUP" --iters "$ITERS" \
     --source "$SCRIPT_DIR/../test_coco/val2017" \
-    --out "detector_latency_rpi5_${INPUT_SIZE}_ort.json" >/dev/null 2>&1 || { echo "[e] bench failed"; exit 1; }
+    --out "detector_latency_rpi5_${INPUT_SIZE}_ort${OUT_SUFFIX}.json" >/dev/null 2>&1 || { echo "[e] bench failed"; exit 1; }
 else
   python bench_yolov8.py \
   --backend ort \
@@ -58,6 +59,6 @@ else
   --imgsz "$INPUT_SIZE" \
   --warmup "$WARMUP" --iters "$ITERS" \
   --source "$SCRIPT_DIR/../test_coco/val2017" \
-  --out "detector_latency_rpi5_${INPUT_SIZE}_ort.json"
+  --out "detector_latency_rpi5_${INPUT_SIZE}_ort${OUT_SUFFIX}.json"
 fi
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Latency benchmark for YOLOv8 ONNX / TensorRT / OpenVINO.
+
 Writes JSON with summary (mean/p50/p95) and per-frame latencies.
 """
 import argparse
@@ -49,6 +50,7 @@ def bench_ort(onnx_path, imgsz, warmup, iters, source):
     inp_name = sess.get_inputs()[0].name
     lat = []
     ids = []
+    temps: list[float] = []
     for _, im in get_frames(source, warmup):
         x = letterbox(im, imgsz).transpose(2, 0, 1)[None].astype(np.float32) / 255.0
         sess.run(None, {inp_name: x})
@@ -59,6 +61,7 @@ def bench_ort(onnx_path, imgsz, warmup, iters, source):
         lat.append((time.perf_counter() - t0) * 1000.0)
         ids.append(fid)
     return ids, lat
+
 
 
 def bench_trt(engine_path, imgsz, warmup, iters, source):
@@ -215,6 +218,7 @@ def main():
     ap.add_argument("--model-name", default="", help="Model name to embed in JSON (e.g., yolov8n)")
     ap.add_argument("--ov-device", default="CPU", help="OpenVINO device, e.g., CPU")
     ap.add_argument("--cadence", type=int, default=1, help="Run detector every N frames; reuse ROI on others")
+
     args = ap.parse_args()
 
     if args.backend == "trt" and not args.engine:
@@ -264,6 +268,7 @@ def main():
                 args.onnx, args.imgsz, args.warmup, args.iters, args.source, args.ov_device
             )
 
+
     arr = np.array(lat, dtype=np.float32)
     # Ensure native Python floats for JSON safety
     p50 = float(np.percentile(arr, 50))
@@ -279,6 +284,7 @@ def main():
         stem = os.path.splitext(base)[0]
         model_name = stem.split("_")[0] if stem else ""
 
+
     data = {
         "summary": {
             "mean_ms": float(round(mean, 2)),
@@ -287,6 +293,7 @@ def main():
             "imgsz": int(args.imgsz),
             "backend": args.backend,
             **({"model": model_name} if model_name else {}),
+
         },
         "per_frame": {ids[i]: float(round(float(arr[i]), 2)) for i in range(len(ids))},
     }

@@ -98,6 +98,7 @@ def run_trtexec(engine, warmup, iters):
             summary = parse_metrics(ln)
             if summary:
                 return summary, []
+
     # If no summary line, try parse any collected times
     if times:
         avg = mean(times)
@@ -106,6 +107,7 @@ def run_trtexec(engine, warmup, iters):
     summary = parse_metrics(proc.stdout)
     if summary:
         return summary, []
+
     raise SystemExit("Could not parse trtexec output for latency metrics")
 
 
@@ -117,6 +119,7 @@ def main():
     ap.add_argument("--iters", type=int, default=300)
     ap.add_argument("--out", default="detector_latency_trtexec.json")
     ap.add_argument("--model-name", default="", help="Model name to embed in JSON (e.g., yolov8n)")
+
     args = ap.parse_args()
     summary, per_iter = run_trtexec(args.engine, args.warmup, args.iters)
     # Fill missing with mean if needed
@@ -129,6 +132,7 @@ def main():
             "imgsz": args.imgsz,
             "backend": "trtexec",
             **({"model": args.model_name} if args.model_name else {}),
+
         },
         "per_frame": {
             f"iter_{i:04d}": round(float(t), 2) for i, t in enumerate(per_iter)
