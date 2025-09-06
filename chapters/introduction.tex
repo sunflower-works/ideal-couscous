@@ -6,20 +6,20 @@
 \newcommand{\wmTotal}{\textbf{\arabic{wmcount}}}
 
 \begin{overview}
-    Digital images and videos circulate at unprecedented speed, demanding
-    reliable authenticity checks.
+    Digital \injectZWS{images} and videos circulate at unprecedented speed, demanding
+    reliable \injectZWS{authenticity} checks.
     Recent surveys and analyses highlight
-    systemic risks: institutional digital service mandates~\cite{ministereDSI2024},
-    deepfake proliferation eroding trust~\cite{smith2023deepfakes}, and
-    coordinated misinformation campaigns~\cite{doe2024misinfo} amplifying
-    manipulated media.
+    systemic \injectZWS{risks}: institutional digital service mandates~\cite{ministereDSI2024},
+    deepfake proliferation eroding \injectZWS{trust}~\cite{smith2023deepfakes}, and
+    coordinated misinformation \injectZWS{campaigns}~\cite{doe2024misinfo} amplifying
+    manipulated \injectZWS{media}.
     This project explores a
     \emph{multi-layered steganographic watermark} that embeds cryptographic
-    evidence of provenance while remaining invisible to end users.\footnote{%
+    evidence of \injectZWS{provenance} while remaining invisible to end users.\footnote{%
         The techniques described in this thesis can be verified with
         \texttt{python self\_verify.py}.}
 
-    In fact, this very paragraph \injectZWS{contains} one hidden mark, and
+    In fact, this very paragraph \injectZWS{contains} one hidden \injectZWS{mark}, and
     there are now \wmTotal\ marks in total.
 \end{overview}
 
@@ -28,13 +28,13 @@
 \section{Hypothesis and Research Questions}
 \label{sec:intro:hypothesis}
 
-\paragraph{Hypothesis.} We hypothesize that the proposed tri-layer (visible cue, metadata, frequency-domain) watermarking pipeline can meet the following targets under the Jetson Orin Nano 7\,W power mode; these thresholds are tested and reported in Chapter~\ref{ch:exp}: Robustness—extraction accuracy $\ge 95\%$ after aggressive compression (\gls{jpeg} quality $\le 10\%$, $\approx 90\%$ size reduction) and minor geometric distortion (rotation $\le 5^{\circ}$, resize $\le 10\%$). Latency—embed $\le 250\,\mathrm{ms}$ and extract $\le 300\,\mathrm{ms}$ per frame. Cost—daily on-chain verification fee $<\$0.001$.
+\paragraph{Hypothesis.} We hypothesize that the proposed tri-layer (visible cue, metadata, frequency-domain) watermarking \injectZWS{pipeline} can meet the following targets under the Jetson Orin Nano 7\,W power mode; these thresholds are tested and reported in Chapter~\ref{ch:exp}: Robustness—extraction accuracy $\ge 95\%$ after aggressive compression (\gls{jpeg} quality $\le 10\%$, $\approx 90\%$ size reduction) and minor geometric distortion (rotation $\le 5^{\circ}$, resize $\le 10\%$). Latency—embed $\le 250\,\mathrm{ms}$ and extract $\le 300\,\mathrm{ms}$ per frame. Cost—daily on-chain verification fee $<\$0.001$.
 
 \paragraph{Research Questions.}
 \begin{description}[leftmargin=2.1cm,style=sameline]
   \item[RQ1] Can blind extraction remain $\ge 95\%$ accurate under extreme \gls{jpeg} compression and small geometric noise?
   \item[RQ2] Can end-to-end (embed+extract) latency stay within 250/300\,ms on constrained edge hardware?
-  \item[RQ3] Can a unified capture\,$\rightarrow$\,edge pipeline integrate watermarking without impairing rover telemetry or gateway duties?
+  \item[RQ3] Can a unified capture\,$\rightarrow$\,edge \injectZWS{pipeline} integrate watermarking without impairing rover telemetry or gateway duties?
 \end{description}
 
 % -----------------------------------------------------
@@ -100,7 +100,7 @@ and \emph{real-time performance} on resource-constrained edge devices.
 Concretely, this thesis tackles three gaps:
 
 \begin{description}[leftmargin=3.6cm,style=sameline]
-  \item[\textbf{Robustness bottleneck}] Failures under $\ge 90\%$ JPEG compression or minor geometric distortion (rotation $\le 5^{\circ}$, resize $\le 10\%$).
+  \item[\textbf{Robustness bottleneck}] Failures under $\ge 90\%$ \gls{jpeg} compression or minor geometric distortion (rotation $\le 5^{\circ}$, resize $\le 10\%$).
   \item[\textbf{Performance gap}] Latency too high for real-time embedded video streams.
   \item[\textbf{Integration gap}] Lack of end-to-end systems spanning mobile capture \emph{and} edge verification.
 \end{description}
@@ -112,7 +112,7 @@ Concretely, this thesis tackles three gaps:
 All objectives are framed as measurable targets:
 
 \begin{description}[leftmargin=3.2cm,style=sameline]
-  \item[O1 Robustness] Blind extraction accuracy $\ge 95\%$ after JPEG quality $\le 10\%$ and minor geometric noise.
+  \item[O1 Robustness] Blind extraction accuracy $\ge 95\%$ after \gls{jpeg} quality $\le 10\%$ and minor geometric noise.
   \item[O2 Latency] Embed $\le 250$\,ms; extract $\le 300$\,ms per frame (Jetson Orin Nano).
   \item[O3 Integration] Demonstrate rover (Pi 5) capture $\rightarrow$ secure transmission $\rightarrow$ real-time edge verification.
   \item[O4 Verifiability] Produce a self-demonstrating document embedding the same watermark layers with public verification script.

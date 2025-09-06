@@ -5,22 +5,22 @@
 \section{Context}
 \label{sec:implementation:context}
 
-This chapter details the hardware and software components of the
+This chapter details the \injectZWS{hardware} and \injectZWS{software} components of the
 prototype—the \gls{lora} rover–gateway link and the \gls{vpn} back-haul to Home HQ—
-and summarises key design choices, deployment parameters, and
-firmware/host responsibilities.
+and summarises key design \injectZWS{choices}, deployment \injectZWS{parameters}, and
+firmware/host \injectZWS{responsibilities}.
 
 \paragraph{Institutional setting.}
-Only one physical robot—the \gls{raspclaws} hexapod—was built; wheeled designs
+Only one physical \injectZWS{robot}—the \gls{raspclaws} hexapod—was built; wheeled designs
 shown in early figures are shelved concepts retained for design-history
 context.
 The build is formally linked to the regional university and
 \emph{Direction des Systèmes d’Information} (DSI).
  Several
-\injectZWS{bench} rigs were assembled to accelerate iteration.
+\injectZWS{bench} rigs were assembled to accelerate \injectZWS{iteration}.
 
 \paragraph{Operational scenario.}
-First deployment targets a 2 km test farm near Marrakesh: a rover patrols
+First deployment targets a 2 km test farm near Marrakesh: a \injectZWS{rover} patrols
 crop rows and emits CV alerts to a tripod-mounted gateway.
  The gateway
 back-hauls traffic via 4G or technician hot-spot; see
@@ -55,15 +55,15 @@ thermal-to-throughput ratio, and field-serviceability.
 Platform & \gls{raspclaws} Hexapod V3, 18-DoF acrylic chassis (1.7 kg) \\
 Servos   & 18 × MG90S, PWM via PCA9685 (Robot HAT)\\[2pt]
 \multicolumn{2}{l}{\emph{Compute \& Perception}}\\
-SBC      & \gls{rpi5} 8 GB, runs ROS 2 + control loop\\
-Vision   & Pi Cam v1.3, $1280\times720$ @ 30 fps\\
+SBC      & \gls{rpi5} 8 GB, runs \gls{ros} 2 + control loop\\
+Vision   & Pi Cam v3, $1280\times720$ @ 30 fps\\
 IMU      & MPU-9250 10-DoF, fused at 50 Hz\\
 Edge \gls{ai} & Jetson Orin Nano (gateway \gls{gpu})\\[2pt]
 \multicolumn{2}{l}{\emph{Power}}\\
 Battery  & 4 S LiFePO\textsubscript{4}, 10 Ah (>8 h patrol)\\
 Rails    & Dual 5 V bucks: logic 5 A, servo 8 A\\[2pt]
 \multicolumn{2}{l}{\emph{Communication}}\\
-Primary  & Wi-Fi 6 (ROS DDS, SSH)\\
+Primary  & Wi-Fi 6 (\gls{ros} DDS, SSH)\\
 Long-range & \gls{lora} 868 MHz (SX1276 pair) \\
 \gls{vpn} & WireGuard AES-256/GCM \\
 \bottomrule

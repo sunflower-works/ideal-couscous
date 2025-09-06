@@ -6,7 +6,8 @@ Discrete Wavelet Transform (DWT) used by the frequency watermark layer.
 
 \paragraph{1-D filter bank view.} A separable orthogonal wavelet (e.g. Haar)
 implements analysis via low–pass $h[n]$ and high–pass $g[n]$ filters followed by
-down–sampling by 2. For a 1-D signal $x[n]$ the approximation and detail
+down–sampling by 2.
+For a 1-D signal $x[n]$ the approximation and detail
 coefficients are
 \[
   a_k = \sum_n x[n] h[2k-n],\qquad d_k = \sum_n x[n] g[2k-n].
@@ -30,7 +31,8 @@ no boundary extension complexity; more elaborate biorthogonal wavelets (e.g.
 Daubechies 9/7) marginally improve imperceptibility but raise compute cost.
 
 \paragraph{Reference Figure.} Figure~\ref{fig:dwt_layout_ref} sketches the band
-layout (single level). The watermark selects blocks under a keyed PRNG mask.
+layout (single level).
+The watermark selects blocks under a keyed PRNG mask.
 
 \begin{figure}[ht]
   \centering
@@ -39,6 +41,6 @@ layout (single level). The watermark selects blocks under a keyed PRNG mask.
   \label{fig:dwt_layout_ref}
 \end{figure}
 
-\paragraph{Relation to Section~\ref{subsec:embedding-layer}.} The notation in
+\paragraph[Relation to Section ref{subsec:embedding-layer}.]{Relation to Section~\ref{subsec:embedding-layer}.} The notation in
 Eq.~\eqref{eq:svd_quant} assumes the block-wise \gls{svd} is applied after the \gls{dwt} on
 a chosen band; this appendix formalises the transform underlying that step.

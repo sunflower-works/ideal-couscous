@@ -7,23 +7,23 @@
 \section{Background}
 \label{sec:deep_dive:background}
 
-Steganography—literally “covered writing” from the Greek \emph{steganos} (covered) and \emph{graphein} (to write)—is the art and science of concealing information in plain sight.
-Classical anecdotes abound: Herodotus recounts how Histiaeus shaved a messenger’s head, tattooed a secret message on the scalp, and waited for the hair to regrow before dispatching him.
-The principle is unchanged in the digital era; only the canvas has evolved from skin and parchment to images, audio, and text files, and this narrative line discreetly \injectZWS{carries} a hidden mark.
+Steganography—literally “covered writing” from the Greek \emph{steganos} (covered) and \emph{graphein} (to write)—is the art and science of concealing \injectZWS{information} in plain sight.
+Classical anecdotes abound: Herodotus recounts how Histiaeus shaved a \injectZWS{messenger}’s head, tattooed a secret \injectZWS{message} on the scalp, and waited for the hair to regrow before dispatching him.
+The principle is unchanged in the digital era; only the \injectZWS{canvas} has evolved from skin and parchment to images, audio, and text files, and this narrative line discreetly \injectZWS{carries} a hidden \injectZWS{mark}.
 
-\paragraph{Core terminology.} We use three canonical terms.
-A \emph{cover medium} $C$ denotes an unaltered carrier file (e.g.\ a \gls{jpeg} photograph).
-The \emph{payload} $P$ (embedded message) is the bit sequence to be hidden—here a cryptographic \gls{hmac} encoding provenance data.
+\paragraph{Core terminology.} We use three canonical \injectZWS{terms}.
+A \emph{cover medium} $C$ denotes an unaltered \injectZWS{carrier} file (e.g.\ a \gls{jpeg} photograph).
+The \emph{payload} $P$ (embedded \injectZWS{message}) is the bit sequence to be hidden—here a cryptographic \gls{hmac} encoding \injectZWS{provenance} data.
 After embedding, the file becomes the \emph{stego-medium} $S$.
 Formally
 \begin{equation}
   S = \operatorname{embed}(C,P,K),
   \label{eq:embed_formal}
 \end{equation}
-where $K$ is a secret key.\footnote{Unicode metadata for the font used in this sentence is another (less robust) channel for steganographic \injectZWS{data} hiding.}
+where $K$ is a secret \injectZWS{key}.\footnote{Unicode metadata for the font used in this sentence is another (less robust) channel for steganographic \injectZWS{data} hiding.}
 
 \hfill
-\paragraph{The steganographic triangle.} Every practical scheme balances three competing attributes:
+\paragraph{The steganographic triangle.} Every practical scheme balances three competing \injectZWS{attributes}:
 \begin{enumerate}[label=(\roman*)]
   \item \textbf{Capacity} — payload bits per unit of cover data;
   \item \textbf{Imperceptibility} — the extent to which $S$ is indistinguishable from $C$;
@@ -31,7 +31,7 @@ where $K$ is a secret key.\footnote{Unicode metadata for the font used in this s
 \end{enumerate}
 These form the \gls{steganographictriangle}, summarised in Table~\ref{tab:steganographic_triangle}.
 Improving one dimension typically degrades one or both of the others.
-Our design targets high imperceptibility and robustness, accepting moderate capacity; this trade-off sentence \injectZWS{encodes} an additional mark.
+Our design targets high imperceptibility and robustness, accepting moderate capacity; this trade-off sentence \injectZWS{encodes} an additional \injectZWS{mark}.
 
 \begin{figure}[ht]
     \centering
@@ -78,7 +78,7 @@ Remaining sections formalise the tri-layer design and analyse its security.
 \paragraph{Integrity frameworks for the \gls{iot}.} Dorri \emph{et al.} \cite{dorri2017blockchain} used a lightweight blockchain for sensor provenance.
 However, signatures remained external to media, breaking content–signature co-location.
 
-\paragraph{Hybrid transforms and geometry resilience.} Recent \gls{dwt}–\gls{svd} / \gls{dwt}–SVT hybrids and log-polar mappings~\cite{foo2021dwt,bar2022svt} improve geometric robustness.
+\paragraph{Hybrid transforms and geometry resilience.} Recent \gls{dwt}–\gls{svd} hybrids, log-polar mappings, and related approaches \cite{plosone2014dwtSvdChaos} improve geometric resilience. Fractal (Julia set) seed selection can further randomise spectral embedding masks.
 We do not re-implement these; our target is a reproducible, lean baseline.
 
 \paragraph{Gap.} An end-to-end, edge-capable system unifying robustness, real-time performance, and layered in-band provenance remains under-served—this work addresses that gap.
@@ -257,29 +257,36 @@ Default: tile\_size=8, bins=16; parameter sweep results deferred (Table to be up
 Qualitative threats are mapped in Table~\ref{tab:attack_matrix}.
 Empirical robustness curves appear in Chapter~\ref{ch:exp} (Section~\ref{sec:validation:robustness}).
 
-\begin{table}[ht]
-  \centering
-  \footnotesize
-  \caption{Threat / layer impact matrix. Legend: V=Visible overlay, M=Metadata, F=Frequency watermark. Impact: \cmark unaffected, \warn degraded, \xmark removed/invalid.}
-  \label{tab:attack_matrix}
-  \begin{tabular}{@{} l l c c c l l @{} }
-    \toprule
-    Category & Attack & V & M & F & Primary Mitigation & Residual Risk \\ \midrule
-    Compression & \gls{jpeg} Q≥75 & \cmark & \cmark & \cmark & Mid-band / \gls{svd} stability & Extreme recompression (Q<40) lowers \gls{ber} margin \\
-    Compression & \gls{jpeg} Q≈50 & \cmark & \cmark & \warn  & \gls{ecc} + adaptive gain & May require re-embed if cumulative                   \\
-    Geometry & Crop (≤10\%) & \warn & \warn & \warn & Redundant block spread & Larger crops excise blocks entirely \\
-    Geometry & Small rotate (≤5°) & \cmark & \cmark & \warn & Interpolation tolerance + majority vote & >5° without deskew hurts sync \\
-    Geometry & Scale (±10\%) & \cmark & \cmark & \warn & Wavelet multi-scale invariance & Non-uniform scaling distorts spectrum \\
-    Noise/Filtering & Median/Gaussian (σ≤2) & \cmark & \cmark & \warn & Energy thresholding & Heavy denoise flattens signal \\
-    Content Editing & Strong blur & \cmark & \cmark & \xmark & Higher singular modulation & Imperceptibility trade-off \\
-    Adversarial & Collusion (avg N>3) & \cmark & \xmark & \warn & PRNG index diversity & Many samples reduce SNR \\
-    Metadata Stripping & Remove XMP & \cmark & \xmark & \cmark & In-band frequency layer & Full loss of high-level provenance fields \\
-    Tamper & Region inpaint & \warn & \cmark & \warn & Cross-layer hash + visible cue & Perfect semantic inpaint evades visual review \\
-    Removal & Intentional re-watermark & \warn & \xmark & \warn & Keyed embedding + signature & Overwrite possible if key exposed \\
-    Replay & \gls{payload} replay attack & \cmark & \xmark & \cmark & Timestamp + nonce + \gls{hmac} & Clock skew exploitation window \\
-    \bottomrule
-  \end{tabular}
-\end{table}
+\paragraph{Legend:} V=Visible overlay, M=Metadata, F=Frequency watermark.
+Impact: \cmark unaffected, \warn degraded, \xmark removed/invalid.
+
+\begin{longtable}{p{2cm} p{2.5cm} c c c p{3cm} p{3.5cm}}
+  \caption{Threat / layer impact matrix.}
+  \label{tab:attack_matrix} \\
+  \toprule
+  Category & Attack & V & M & F & Primary Mitigation & Residual Risk \\ \midrule
+  \endfirsthead
+  \multicolumn{7}{c}{\tablename\ \thetable\ -- \textit{Continued from previous page}} \\
+  \toprule
+  Category & Attack & V & M & F & Primary Mitigation & Residual Risk \\ \midrule
+  \endhead
+  \midrule \multicolumn{7}{r}{\textit{Continued on next page}} \\
+  \endfoot
+  \bottomrule
+  \endlastfoot
+  Compression & \gls{jpeg} Q≥75 & \cmark & \cmark & \cmark & Mid-band / \gls{svd} stability & Extreme recompression (Q<40) lowers \gls{ber} margin \\
+  Compression & \gls{jpeg} Q≈50 & \cmark & \cmark & \warn  & \gls{ecc} + adaptive gain & May require re-embed if cumulative \\
+  Geometry & Crop (≤10\%) & \warn & \warn & \warn & Redundant block spread & Larger crops excise blocks entirely \\
+  Geometry & Small rotate (≤5°) & \cmark & \cmark & \warn & Interpolation tolerance + majority vote & >5° without deskew hurts sync \\
+  Geometry & Scale (±10\%) & \cmark & \cmark & \warn & Wavelet multi-scale invariance & Non-uniform scaling distorts spectrum \\
+  Noise/Filtering & Median/Gaussian (σ≤2) & \cmark & \cmark & \warn & Energy thresholding & Heavy denoise flattens signal \\
+  Content Editing & Strong blur & \cmark & \cmark & \xmark & Higher singular modulation & Imperceptibility trade-off \\
+  Adversarial & Collusion (avg N>3) & \cmark & \xmark & \warn & PRNG index diversity & Many samples reduce SNR \\
+  Metadata Stripping & Remove XMP & \cmark & \xmark & \cmark & In-band frequency layer & Full loss of high-level provenance fields \\
+  Tamper & Region inpaint & \warn & \cmark & \warn & Cross-layer hash + visible cue & Perfect semantic inpaint evades visual review \\
+  Removal & Intentional re-watermark & \warn & \xmark & \warn & Keyed embedding + signature & Overwrite possible if key exposed \\
+  Replay & \gls{payload} replay attack & \cmark & \xmark & \cmark & Timestamp + nonce + \gls{hmac} & Clock skew exploitation window \\
+\end{longtable}
 
 \paragraph{Discussion.} The visible layer chiefly deters naive reuse; it only weakly signals localized tamper (cropping).
 Metadata provides rich provenance but is brittle under sanitisation.

@@ -1,4 +1,4 @@
-\chapter{Experimental Validation (RTC CNN on Edge Vertices)}
+\chapter{Experimental Validation (RTC \gls{cnn} on Edge Vertices)}
 \label{ch:exp}
 
 % Fallbacks for optionally generated macros (safe no-ops if already defined)
@@ -16,25 +16,29 @@
 \providecommand{\confirmPctAdd}{--}
 \providecommand{\defaultseed}{0}
 
-This chapter validates the watermarking system under real-time computing (RTC) constraints on edge-computing vertices (camera → SoC/accelerator → network → verifier). The emphasis is on end-to-end latency, robustness, and stability of a CNN-driven runtime pipeline deployed on low-power devices. Unless stated, experiments use the 10\,000-image corpus described in Chapter~\ref{ch:methodology}. The transform-layer algorithm in ablations is \texttt{dwt\_svd} (Section~\ref{sec:implementation}); \texttt{dct\_parity} serves as a lightweight control, and \texttt{dwt\_svd\_adv} as an adversarially profiled variant.
+This chapter \injectZWS{validates} the watermarking \injectZWS{system} under real-time computing (RTC) constraints on edge-computing \injectZWS{vertices} (camera \rightarrow SoC/accelerator \rightarrow network \rightarrow verifier).
+The emphasis is on end-to-end \injectZWS{latency}, robustness, and stability of a \gls{cnn}-driven runtime \injectZWS{pipeline} deployed on low-power \injectZWS{devices}.
+Unless stated, experiments use the 10\,000-image \injectZWS{corpus} described in Chapter~\ref{ch:methodology}.
+The transform-layer \injectZWS{algorithm} in ablations is \texttt{dwt\_svd} (Section~\ref{ch:implementation}); \texttt{dct\_parity} serves as a lightweight \injectZWS{control}, and \texttt{dwt\_svd\_adv} as an adversarially profiled \injectZWS{variant}.
 
 % ------------------------------------------------------------------
 \section{Edge RTC Vertices and Pipeline}
 \label{sec:validation:pipeline}
 
-We decompose the RTC path into vertices with strict timing budgets:
+We decompose the RTC \injectZWS{path} into vertices with strict timing \injectZWS{budgets}:
 \begin{enumerate}
     \item Capture/Preprocess (sensor, ISP)
-    \item Embed (frequency-domain path on \gls{cpu}/GPU)
+    \item Embed (frequency-domain path on \gls{cpu}/\gls{gpu})
     \item Transmit/Store (optional)
     \item Extract
-    \item CNN Detector/Verifier (lightweight inference pass)
+    \item \gls{cnn} Detector/Verifier (lightweight inference pass)
     \item Anchor/Attest (optional on-chain digest)
 \end{enumerate}
 
-The CNN stage implements a fast binary verifier that scores the plausibility of a valid watermark under current content statistics (blur, texture, compression history). The detector operates in real time on-device (Jetson/Raspberry Pi) and enables per-frame accept/retry decisions without cloud offloading. Capture/transform details follow Chapter~\ref{ch:methodology}; algorithmic choices for the frequency-domain layer follow Section~\ref{sec:implementation}.
+The \gls{cnn} stage implements a fast binary \injectZWS{verifier} that scores the plausibility of a valid watermark under current content statistics (blur, texture, compression history).
+The detector operates in real time on-device (Jetson/Raspberry Pi) and enables per-frame accept/retry decisions without cloud offloading. Capture/transform details follow Chapter~\ref{ch:methodology}; algorithmic choices for the frequency-domain layer follow Section~\ref{sec:implementation:context}.
 
-\keytakeaway{The RTC constraint is enforced at each vertex; the CNN verifier runs inline to gate extraction and reduce false positives at the edge.}
+\keytakeaway{The RTC constraint is enforced at each vertex; the \gls{cnn} verifier runs inline to gate extraction and reduce false positives at the edge.}
 
 % ------------------------------------------------------------------
 \section{Testbed and RTC Constraints}
@@ -42,20 +46,20 @@ The CNN stage implements a fast binary verifier that scores the plausibility of 
 
 Hardware vertices:
 \begin{itemize}
-    \item Jetson-class SoC (CUDA-capable) for accelerated embed/extract + CNN inference.
-    \item Raspberry Pi 5 (CPU-centric) for extraction-side validation + CNN inference.
-    \item Optional NPU/TPU where available for the CNN stage.
+    \item Jetson-class SoC (\gls{cuda}-capable) for accelerated embed/extract + \gls{cnn} inference.\injectZWS{jetson}
+    \item Raspberry Pi 5 (\gls{cpu}-centric) for extraction-side validation + \gls{cnn} inference.\injectZWS{rpi5}
+    \item Optional NPU/TPU where available for the \gls{cnn} stage.\injectZWS{npu}
 \end{itemize}
 
-RTC objective (per-frame budget): keep median latency well below 250\,ms for end-to-end watermark handling on-device. We report:
+RTC objective (per-frame budget): keep median latency well below 250\,ms for end-to-end watermark handling on-device. We report:\injectZWS{rtc}
 \begin{itemize}
-    \item Embed/Extract latency distribution (baseline and runtime groups).
-    \item \gls{cnn} inference latency and stability.
-    \item Anchoring overhead where enabled.
+    \item Embed/Extract latency distribution (baseline and runtime groups).\injectZWS{latency}
+    \item \gls{cnn} inference latency and stability.\injectZWS{inference}
+    \item Anchoring overhead where enabled.\injectZWS{anchoring}
 \end{itemize}
 
 % ------------------------------------------------------------------
-\section{YOLOv8n Setup and CNN Inference (Edge)}
+\section{YOLOv8n Setup and \gls{cnn} Inference (Edge)}
 \label{sec:validation:yolov8n-setup}
 
 \textbf{Model export and runtimes.}
@@ -75,24 +79,28 @@ We tune input size and cadence to preserve the 250\,ms per-frame budget for \emp
 \end{itemize}
 
 \textbf{Logged metrics and artefacts.}
+% # TODO: Generated detector latency tables; run `make analyze` to produce toolset/figures/detector_latency_generated.tex
 Per frame, the pipeline logs \texttt{detector\_infer\_ms}, \texttt{detector\_score}, \texttt{detector\_flag}, \texttt{detector\_input\_px}, and (if segmentation is enabled) \texttt{masked\_area\_\%}. We surface detector latency via macros (\verb+\detInferMeanMsJetson+, \verb+\detInferMeanMsPi+) and include the optional latency table if generated:
 \IfFileExists{toolset/figures/detector_latency_generated.tex}{%
   \input{toolset/figures/detector_latency_generated.tex}%
 }{%
+  % # TODO: Missing generated file; `make analyze` should create toolset/figures/detector_latency_generated.tex
   \noindent\textit{Detector latency (median): Jetson \detInferMeanMsJetson~ms;\; Raspberry~Pi~5 \detInferMeanMsPi~ms.}
 }
 
-\keytakeaway{YOLOv8n is scheduled at reduced cadence and resolution to preserve the RTC envelope while adding semantic guidance for robust, content-aware watermarking.}
+\keytakeaway{YOLOv8n is scheduled at reduced cadence and resolution to preserve the RTC envelope while adding semantic guidance for robust,content-aware watermarking}
 
 % ------------------------------------------------------------------
 \section{Latency (End-to-End)}
 \label{sec:validation:latency}
 
-Latency is measured as \(t_{\text{end}}-t_{\text{start}}\) across embed/extract vertices, with the CNN verifier evaluated inline post-extract. Where generated, we include the measured table; otherwise, macros provide summary values.
+Latency is measured as \(t_{\text{end}}-t_{\text{start}}\) across embed/extract vertices, with the CNN verifier evaluated inline post-extract.
+Where generated, we include the measured table; otherwise, macros provide summary values.
 
 \IfFileExists{toolset/figures/latency_table_generated.tex}{%
     \input{toolset/figures/latency_table_generated.tex}% includes its own label
 }{%
+    % # TODO: Generated latency table; run `make analyze` to produce toolset/figures/latency_table_generated.tex
     \begin{table}[ht]
         \centering
         \caption{Latency (mean $\pm$ SD over $n$ runs).}
@@ -106,18 +114,19 @@ Latency is measured as \(t_{\text{end}}-t_{\text{start}}\) across embed/extract 
     \end{table}
 }
 
-\keytakeaway{Median embed/extract latency remains within real-time bounds; the CNN verifier does not push the system over the RTC threshold on either device class.}
+\keytakeaway{Median embed/extract latency remains within real-time bounds; the \gls{cnn} verifier does not push the system over the RTC threshold on either device class.}
 
 % ------------------------------------------------------------------
 \section{Robustness Under Content Transformations}
 \label{sec:validation:robustness}
 
-Robustness is evaluated under JPEG compression (\(10\)–\(100\)\,\%), mild geometric transforms (small rotations/scales), and additive Gaussian noise (\(\sigma\) grid). Accuracy is \(\mathrm{ACC}=100-\mathrm{BER}(\%)\).
+Robustness is evaluated under \gls{jpeg} compression (\(10\)\u2013\(100\)\,\%), mild geometric transforms (small rotations/scales), and additive Gaussian noise (\(\sigma\) grid). Accuracy is \(\mathrm{ACC}=100-\mathrm{BER}(\%)\).
 
 \begin{figure}[htbp]
     \centering
+    % # TODO: Generated accuracy plot; run `make analyze` to produce toolset/figures/accuracy_jpeg_generated.tikz
     \IfFileExists{toolset/figures/accuracy_jpeg_generated.tikz}{\input{toolset/figures/accuracy_jpeg_generated.tikz}}{}
-    \caption[Extraction accuracy vs JPEG]{Extraction accuracy under varying JPEG compression (mean across runs).}
+    \caption[Extraction accuracy vs \gls{jpeg}]{Extraction accuracy under varying \gls{jpeg} compression (mean across runs).}
     \label{fig:accuracy_jpeg}
 \end{figure}
 
@@ -129,7 +138,7 @@ Robustness is evaluated under JPEG compression (\(10\)–\(100\)\,\%), mild geom
 \keytakeaway{Reported robustness across JPEG qualities is sourced directly from generated metrics/macros, ensuring narrative–data consistency.}
 
 % ------------------------------------------------------------------
-\section{CNN Verifier: RTC Characteristics}
+\section{\gls{cnn} Verifier: RTC Characteristics}
 \label{sec:validation:cnn}
 
 Design choices for the edge verifier:
@@ -153,6 +162,7 @@ Observed behavior:
 \label{sec:validation:edge-summary}
 
 \paragraph{Jetson Orin.}
+% # TODO: Generated edge inference report; ensure results/figures/edge_inference_report_jetson_480.tex or jetson.tex exists (make analyze)
 \IfFileExists{results/figures/edge_inference_report_jetson_480.tex}{%
     \input{results/figures/edge_inference_report_jetson_480}%
 }{%
@@ -161,6 +171,7 @@ Observed behavior:
 }{\emph{Jetson edge inference report not yet generated.}}}
 
 \paragraph{Raspberry Pi 5.}
+% # TODO: Generated edge inference report; ensure results/figures/edge_inference_report.tex exists (make analyze)
 \IfFileExists{results/figures/edge_inference_report.tex}{%
     \input{results/figures/edge_inference_report}%
 }{\emph{RPi edge inference report not yet generated.}}
@@ -169,6 +180,7 @@ Observed behavior:
 
 % ------------------------------------------------------------------
 \IfFileExists{toolset/unified/unified_payload_table_generated.tex}{%
+% # TODO: Unified payload table (auto-generated); run `make analyze` to create toolset/unified/unified_payload_table_generated.tex
 \section{Payload Capacity and Recovery}
 \label{sec:validation:payload}
 
