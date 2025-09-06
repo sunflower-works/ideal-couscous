@@ -1,0 +1,98 @@
+% schema_end_to_end_v2.tex
+
+% Set to your thumbnail; if missing, a fallback grid is drawn
+\newcommand*\ThumbPath{figures/thumb.png} % force a concrete file with extension
+% Make graphics lookup more robust (place thumb.png in one of these)
+\graphicspath{{figures/}{../figures/}{.}}
+
+% Styles (grayscale, arXiv-friendly)
+% Light accent palette for visual hierarchy
+\definecolor{accentA}{RGB}{236,170,0}   % warm sunflower
+\definecolor{accentAline}{RGB}{180,130,0}
+\definecolor{neutralLane}{gray}{0.97}
+\definecolor{neutralStroke}{gray}{0.75}
+
+% Displayed watermark strength (alpha)
+\newcommand*\AlphaVal{0.35}
+
+\tikzset{
+    >=Latex,
+    node distance=22mm and 38mm, % further spacing to expand across half-page
+    box/.style     = {draw, rounded corners=2pt, align=center, inner sep=3pt, fill=white, line width=0.5pt, draw=black!65},
+    emph/.style    = {draw, rounded corners=2pt, align=center, inner sep=3pt, fill=accentA!18, line width=0.55pt, draw=accentAline},
+    meta/.style    = {draw, rounded corners=2pt, align=center, inner sep=3pt, fill=black!5, line width=0.45pt, draw=black!60},
+    lane/.style    = {rounded corners=3pt, fill=neutralLane, draw=black!10, line width=0.3pt},
+    % Rename 'step' to avoid conflict with TikZ's built-in '/tikz/step' key
+    markstep/.style    = {circle, draw=accentAline, fill=accentA!35, line width=0.5pt, inner sep=0pt, minimum size=4.2mm, font=\scriptsize\bfseries},
+    junction/.style= {circle, draw, inner sep=0pt, minimum size=4.5mm, fill=black!3, line width=0.5pt},
+    lab/.style     = {font=\scriptsize\itshape, text=black!70},
+    % New: backgrounded labels so text doesn’t get lost over panels
+    labbox/.style  = {font=\scriptsize\itshape, text=black!75, fill=white, fill opacity=0.85, text opacity=1, inner sep=1pt, rounded corners=1pt}
+}
+
+\begin{tikzpicture}[font=\footnotesize]
+
+    % Lanes (background panels)
+    \node (lane1_sw) at (0,0) {};
+    \node (lane1_ne) at (18.8,3.6) {};
+    \node[lane, fit=(lane1_sw)(lane1_ne), label={[lab]above:Track [1] • Frequency-domain embedding pipeline}] (lane1) {};
+
+    \node (lane2_sw) at (0,-3.8) {};
+    \node (lane2_ne) at (18.8,-0.1) {};
+    \node[lane, fit=(lane2_sw)(lane2_ne), label={[lab]above:Track [2] • Blockchain anchoring pipeline}] (lane2) {};
+
+    % Track [1]: Original -> Algorithm -> Haar -> Watermarked Path
+    % 1. Original image (thumbnail only; no fallback)
+    \node[box, minimum width=22mm, minimum height=15mm] (orig) at (1.8,1.7) {};
+    \begin{scope}
+        \clip (orig.north west) rectangle (orig.south east);
+        \node[inner sep=0pt, anchor=center] at (orig.center)
+            {\includegraphics[width=19mm,height=13mm,keepaspectratio]{\ThumbPath}};
+    \end{scope}
+    \draw[rounded corners=2pt, line width=0.3pt, draw=black!50] (orig.north west) rectangle (orig.south east);
+    \node[lab, above=0mm of orig] {Input image/frame};
+
+    % 2. Watermark Algorithm
+    \node[box, right=of orig] (algo) {Keyed\\Embedding Kernel};
+    \node[markstep, above left=-1mm and -1mm of algo] {1};
+    \draw[->, line width=0.65pt, draw=accentAline] (orig) -- (algo);
+
+    % 3. Haar DWT Split
+    \node[box, right=of algo] (haar) {2D Haar DWT\\Decomposition (LL,LH,HL,HH)};
+    \node[markstep, above left=-1mm and -1mm of haar] {2};
+    \draw[->, line width=0.65pt, draw=accentAline] (algo) -- (haar)
+    node[labbox, pos=0.52, above, yshift=6pt]{Keyed PRNG-driven spatial strength map ($\alpha=\AlphaVal$)};
+
+    % 4. Watermarked Path (freq-domain)
+    \node[emph, right=of haar] (fpath) {[1] Frequency-domain\\Embedded Coefficients};
+    \node[markstep, above left=-1mm and -1mm of fpath] {3};
+    \draw[->, line width=0.7pt, draw=accentAline] (haar) -- (fpath)
+    node[lab, pos=0.62, above, yshift=2pt]{Subband selection + \gls{svd}-based modulation/quantization};
+    \node[lab, below=1mm of haar] {LL-dominant or selective subbands; Haar for O(N) separable filtering};
+
+    % Track [2]: Blockchain -> Anchored message
+    \node[meta, below=18mm of algo, xshift=0mm, minimum width=26mm] (chain) {Blockchain Client\\Init / Chain Sync};
+    \node[markstep, above left=-1mm and -1mm of chain] {A};
+    % (keep your simple mini-chain glyph if desired)
+
+    \node[meta, right=of chain, minimum width=30mm] (msg) {[2] Anchor Payload\\Rolling Digest};
+    \node[markstep, above left=-1mm and -1mm of msg] {B};
+    \draw[->, line width=0.55pt, draw=black!60] (chain) -- (msg)
+      node[labbox, pos=0.5, above, yshift=4pt]{Authenticated block headers $\rightarrow$ cumulative digest};
+    \node[lab, below=1mm of msg] {Transaction hash/ID + inclusion proof (e.g., Merkle receipt)};
+
+    % Merge and Output
+    \node[junction, right=26mm of fpath] (merge) {$\oplus$};
+    \draw[->, line width=0.75pt, draw=accentAline] (fpath) -- (merge);
+    \draw[->, line width=0.6pt, draw=black!60] (msg.north) |- (merge);
+
+    \node[emph, right=26mm of merge, minimum width=28mm, minimum height=18mm] (out) {};
+    \begin{scope}
+        \clip (out.north west) rectangle (out.south east);
+        \draw[fill=black!20,draw=black!50, line width=0.3pt] ($(out.south west)+(1mm,1mm)$) rectangle ++(10mm,7mm);
+        \draw[fill=black!40,draw=black!50, line width=0.3pt] ($(out.south west)+(12mm,1mm)$) rectangle ++(10mm,7mm);
+        \node[font=\scriptsize\bfseries, text=black!70] at ($(out.north east)+(-6mm,-4.2mm)$) {WM+Digest};
+    \end{scope}
+    \node[lab, above=0mm of out] {Output artifact: watermark + on-chain anchor};
+
+\end{tikzpicture}
