@@ -1285,6 +1285,10 @@ def _build_unified_table(all_runs: Dict[str, Dict[str, pd.DataFrame]]) -> pd.Dat
     return unified
 
 
+def maybe_purge_dummy():
+    pass
+
+
 def main():  # pragma: no cover (script entry)
     args = parse_args()
     if args.no_plots:

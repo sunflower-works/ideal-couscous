@@ -59,9 +59,7 @@ INVISIBLE_CHARS = {
     for name, bytes_val in INVISIBLE_CODEPOINTS.items()
 }
 
-DISCLOSURE_REGEX_DEFAULT = (
-    r"(?:disclosure|watermark|zero[\s-]*width).*?(?P<count>\d{1,9})"
-)
+DISCLOSURE_REGEX_DEFAULT = r"(?:disclosure|watermark|zero[\s-]*width|victory[\s-]*lap|total[\s-]*marks[\s-]*embedded).*?(?P<count>\d{1,9})"
 
 
 @dataclass
@@ -210,6 +208,13 @@ def extract_text_safe(page) -> str:
 def find_disclosure_page(
     pages: List[PageResult], texts: List[str], pattern: re.Pattern
 ) -> Optional[int]:
+    # First, prioritize Victory Lap page - search from the end backwards
+    for i in range(len(texts) - 1, -1, -1):
+        txt = texts[i].lower()
+        if "victory lap" in txt or "total marks embedded" in txt:
+            return i
+
+    # Fallback to original regex search if no Victory Lap found
     for i, txt in enumerate(texts):
         if pattern.search(txt.lower()):
             return i
