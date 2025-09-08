@@ -1,0 +1,148 @@
+# GitHub Actions – RC quality-gate for Project Sunflower
+#
+# What it does on every push or manual dispatch:
+#   1. Restore/mint TeX Live + Python tool-chain
+#   2. Clean build the thesis PDF (`make clean && make all`)
+#   3. Run self-verification script on the freshly built PDF
+#   4. Run analysis pipeline (tables/macros generation)
+#   5. Lint for unresolved refs/cites (??) and LaTeX warnings
+#   6. Produce SHA-256 of the release bundle and expose as output
+#   7. Upload artefacts (PDF, checksum, generated figures/macros)
+#
+# A green check-mark means the candidate is ready to tag `vX.Y.Z-rcN`
+
+name: RC Quality Gate
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:   # run on demand from the GitHub UI
+    inputs:
+      imgsz:
+        description: "Image size for edge benchmarks"
+        required: false
+        default: "640"
+
+jobs:
+  build-verify:
+    runs-on: ubuntu-22.04
+    env:
+      # Keep TL cache across jobs
+      TEXLIVE_HOME: ${{ github.workspace }}/.tlcache
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0        # so `git describe` works if you use it
+
+    # ---------------------------------------------------------
+    # 1) TeX Live (small custom installation ≈ 1 GB cached)
+    # ---------------------------------------------------------
+    - name: Cache TeX Live
+      id: cache-tex
+      uses: actions/cache@v3
+      with:
+        path: ${{ env.TEXLIVE_HOME }}
+        key: tl20XX-${{ hashFiles('**/*.tex') }}
+
+    - name: Install TeX Live (if not cached)
+      if: steps.cache-tex.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends texlive-full ghostscript
+        # Shrink TL into $TEXLIVE_HOME to let cache work
+        mkdir -p "$TEXLIVE_HOME"
+        sudo rsync -a /usr/share/texlive/ "$TEXLIVE_HOME/"
+        sudo rm -rf /usr/share/texlive   # free runner disk
+
+    - name: Add TeX Live to PATH
+      run: echo "$TEXLIVE_HOME/bin/x86_64-linux" >> $GITHUB_PATH
+
+    # ---------------------------------------------------------
+    # 2) Python env for verification & analysis
+    # ---------------------------------------------------------
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install Python dependencies
+      run: pip install -r requirements.txt
+
+    # ---------------------------------------------------------
+    # 3) Clean build
+    # ---------------------------------------------------------
+    - name: Build thesis PDF
+      run: |
+        make clean
+        make all
+      env:
+        # Silence LaTeX interactive prompts
+        FORCE_COLOR: "1"
+
+    # ---------------------------------------------------------
+    # 4) Self-verification
+    # ---------------------------------------------------------
+    - name: Run embedded verifier
+      run: |
+        python self_verify.py --input thesis.pdf
+
+    # ---------------------------------------------------------
+    # 5) Generate analysis tables/macros
+    # ---------------------------------------------------------
+    - name: Run analysis pipeline
+      run: |
+        python unified_analysis.py --just-table
+        # regenerate macros/tikz inside analysis script
+
+    # ---------------------------------------------------------
+    # 6) Lint unresolved refs/cites & overfull boxes
+    # ---------------------------------------------------------
+    - name: Lint LaTeX warnings
+      run: |
+        if grep -n "??" thesis.log; then
+          echo "::error ::Unresolved reference(s)/citation(s) found"; exit 1; fi
+        if grep -n "Overfull \\hbox" thesis.log; then
+          echo "::warning ::Overfull hbox detected"; fi
+
+    # ---------------------------------------------------------
+    # 7) Compute SHA-256 of release zip (if exists) or source tar
+    # ---------------------------------------------------------
+    - name: Make release bundle
+      run: |
+        set -e
+        REL="report-${{ github.sha }}.zip"
+        git archive --format=zip --output "$REL" HEAD
+        echo "REL_ARCHIVE=$REL" >> $GITHUB_ENV
+
+    - name: Compute checksum
+      id: sha
+      run: |
+        SUM=$(sha256sum "$REL_ARCHIVE" | cut -d' ' -f1)
+        echo "sha256=$SUM" >> $GITHUB_OUTPUT
+        echo "Archive SHA256: $SUM"
+
+    # ---------------------------------------------------------
+    # 8) Upload artefacts
+    # ---------------------------------------------------------
+    - name: Upload artefacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: thesis-build
+        path: |
+          thesis.pdf
+          thesis.log
+          ${{ env.REL_ARCHIVE }}
+          toolset/figures/*.tex
+          toolset/metrics_macros.tex
+        retention-days: 7
+
+  # Quick pass/fail badge to gate release tagging
+  summary:
+    needs: build-verify
+    runs-on: ubuntu-latest
+    steps:
+    - name: Workflow result
+      run: echo "RC checks passed ✅ – ready to tag"
