@@ -11,7 +11,7 @@
 % ---------------------------------------------------------------------
 % DOCUMENT METADATA ---------------------------------------------------
 \title{Project Sunflower:\\A Framework for Self-Documenting\\Cryptographic Research in Distributed Robotic Systems}
-\author{BILAL EL}
+\author{Bilal EL KHATABI\\}
 \date{\today}
 
 % =====================================================================
@@ -53,6 +53,63 @@
     \include{chapters/appendix_dwt_refresher}
     \include{chapters/appendix_plots}
     \chapter{Verification Scripts}\label{app:verify}
+
+    % Stable links/macros — update these once per release
+    \providecommand{\repoURL}{https://github.com/sunflower-works/report}
+    \providecommand{\repoTag}{v1.0.0} % tag name for the archived release
+    \providecommand{\repoCommit}{abc1234} % short commit of the release
+    \providecommand{\repoDOI}{10.5281/zenodo.17077512} % replace with actual DOI
+    \providecommand{\archiveSHA}{<fill-with-SHA256-of-release-zip>} % sha256 of archive
+
+    \section*{Availability and immutability}
+    Verification code and artefacts are published at the pinned release:
+    \begin{itemize}
+      \item Source (release tag): \url{\repoURL/releases/tag/\repoTag} (\texttt{git \repoCommit})
+      \item DOI archive: \url{https://doi.org/\repoDOI}
+      \item Archive integrity: \texttt{SHA256=\archiveSHA}
+    \end{itemize}
+    Using a tag/DOI avoids drift from moving branches.
+
+    \section*{Quick verify (tagged release)}
+\begin{minted}[fontsize=\small]{bash}
+# 1) Fetch the exact release
+git clone --depth 1 --branch \repoTag \repoURL
+cd report
+
+# 2) (Optional) Verify the tag signature, if provided
+git tag -v \repoTag  # requires the author's public key imported
+
+# 3) (Optional) Verify the release archive checksum
+# curl -L -o report-\repoTag.zip \repoURL/archive/refs/tags/\repoTag.zip
+# sha256sum report-\repoTag.zip  # should equal: \archiveSHA
+
+# 4) Create an isolated environment and install pinned deps
+python3 -m venv .venv && . .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# 5) Run the verifier against this PDF (or another target)
+python self_verify.py --input thesis.pdf
+\end{minted}
+
+    \paragraph{Notes.}
+    The repository pins versions in the requirements file; do not switch to ``latest'' when reproducing results. If the tag is signed, the \texttt{git tag -v} step will report the signer identity; otherwise skip it.
+
+    \section*{Offline verify (no network)}
+    This thesis ships with the same verification script in the artefacts bundle. If you cannot access GitHub/Zenodo, use:
+\begin{minted}[fontsize=\small]{bash}
+python self_verify.py --input thesis.pdf
+\end{minted}
+    Publish the bundle’s own SHA256 alongside the PDF when distributing offline.
+
+    \section*{Citation and licensing}
+    Please cite the archived release using its DOI:
+    \begin{quote}\small
+    Sunflower Works.
+    Project Sunflower Verification Scripts (\repoTag).\\
+    DOI: \repoDOI. URL: \url{\repoURL/releases/tag/\repoTag}.
+    \end{quote}
+    The repository includes a license and a \texttt{CITATION.cff} file for metadata.
 
 % ---------------------------------------------------------------------
 % FINAL DISCLOSURE PAGE -----------------------------------------------
