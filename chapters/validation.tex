@@ -46,16 +46,17 @@ The detector operates in real time on-device (Jetson/Raspberry Pi) and enables p
 
 Hardware vertices:
 \begin{itemize}
-    \item Jetson-class SoC (\gls{cuda}-capable) for accelerated embed/extract + \gls{cnn} inference.\injectZWS{jetson}
-    \item Raspberry Pi 5 (\gls{cpu}-centric) for extraction-side validation + \gls{cnn} inference.\injectZWS{rpi5}
-    \item Optional NPU/TPU where available for the \gls{cnn} stage.\injectZWS{npu}
+    \item Jetson-class SoC (\gls{cuda}-capable) for accelerated embed/extract + \gls{cnn} inference.
+    \item Raspberry Pi 5 (\gls{cpu}-centric) for extraction-side validation + \gls{cnn} inference.
+    \item Optional NPU/TPU where available for the \gls{cnn} stage.
 \end{itemize}
 
-RTC objective (per-frame budget): keep median latency well below 250\,ms for end-to-end watermark handling on-device. We report:\injectZWS{rtc}
+RTC objective (per-frame budget): keep median latency well below 250\,ms for end-to-end watermark handling on-device.
+We report:\injectZWS{rtc}
 \begin{itemize}
-    \item Embed/Extract latency distribution (baseline and runtime groups).\injectZWS{latency}
-    \item \gls{cnn} inference latency and stability.\injectZWS{inference}
-    \item Anchoring overhead where enabled.\injectZWS{anchoring}
+    \item Embed/Extract latency distribution (baseline and runtime groups).
+    \item \gls{cnn} inference latency and stability.
+    \item Anchoring overhead where enabled.
 \end{itemize}
 
 % ------------------------------------------------------------------
@@ -135,7 +136,7 @@ Robustness is evaluated under \gls{jpeg} compression (\(10\)\u2013\(100\)\,\%), 
 \;Q20=\accJPEGtwenty\%\,,\;Q70=\accJPEGseventy\%\,,\;Q90=\accJPEGninety\%.
 }
 
-\keytakeaway{Reported robustness across JPEG qualities is sourced directly from generated metrics/macros, ensuring narrative–data consistency.}
+\keytakeaway{Reported robustness across JPEG qualities is sourced directly from generated metrics/macros,ensuring narrative–data consistency}
 
 % ------------------------------------------------------------------
 \section{\gls{cnn} Verifier: RTC Characteristics}
@@ -151,7 +152,7 @@ Design choices for the edge verifier:
 Observed behavior:
 \begin{itemize}
     \item Stable inference latency on Jetson-class devices coexisting with frequency-domain extraction.
-    \item On CPU-only devices, inference follows extraction, preserving the median end-to-end budget.
+    \item On \gls{cpu}-only devices, inference follows extraction, preserving the median end-to-end budget.
     \item Detector score correlates negatively with over-blur; aligns with \emph{image\_blur\_metric} for stratified slicing.
 \end{itemize}
 
