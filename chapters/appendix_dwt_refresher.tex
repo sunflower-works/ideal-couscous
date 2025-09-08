@@ -2,7 +2,7 @@
 \chapter{Discrete Wavelet Transform Refresher}\label{app:dwt}
 
 This appendix gives a compact mathematical refresher on the (single–level) 2-D
-Discrete Wavelet Transform (DWT) used by the frequency watermark layer.
+Discrete Wavelet Transform (\gls{dwt}) used by the frequency watermark layer.
 
 \paragraph{1-D filter bank view.} A separable orthogonal wavelet (e.g. Haar)
 implements analysis via low–pass $h[n]$ and high–pass $g[n]$ filters followed by
@@ -16,7 +16,8 @@ Synthesis inverts this with up–sampling and the corresponding synthesis filter
 
 \paragraph{2-D extension.} Applying the 1-D transform first along image rows
 then columns yields four equal–sized sub-bands: LL (approximation), LH (vertical
-detail), HL (horizontal detail), HH (diagonal detail). Only a single level is
+detail), HL (horizontal detail), HH (diagonal detail).
+Only a single level is
 required for our embedding; deeper levels increase latency and reduce spatial
 localisation.
 
