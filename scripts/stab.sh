@@ -2,11 +2,11 @@
 set -euo pipefail
 
 # Remote connection parameters
-JETSON_HOST=${JETSON_HOST:-192.168.1.79}
-JETSON_USER=${JETSON_USER:-orin}
+JETSON_HOST=${JETSON_HOST:-192.168.1.50}
+JETSON_USER=${JETSON_USER:-beb}
 REMOTE_DIR=${REMOTE_DIR:-edge_yolo_scripts}   # relative to ~ on remote
 EDGE_ROOT=${EDGE_ROOT:-edge-yolo}              # remote edge project root (~/edge-yolo)
-LOCAL_REPO=${LOCAL_REPO:-/home/beb/report/scripts}
+LOCAL_REPO=${LOCAL_REPO:-/home/beb/GolandProjects/report/scripts}
 # New: full project sync parameters
 PROJECT_ROOT=${PROJECT_ROOT:-$(cd "$(dirname "$LOCAL_REPO")" && pwd)}   # local project root (default parent of scripts)
 REMOTE_PROJECT_DIR=${REMOTE_PROJECT_DIR:-report}                           # remote dir name for full project (~/<name>)
@@ -33,6 +33,7 @@ fi
 
 # Warn if invoked via wrong relative path (common pitfall: inside scripts dir running 'bash scripts/stab.sh')
 SCRIPT_BASENAME=$(basename "$0")
+if [ "$SCRIPT_BASENAME" != "stab.sh" ]; then
   echo "[w] Unexpected script invocation name: $SCRIPT_BASENAME. This may indicate incorrect script path resolution. Please run the script as './stab.sh' from the scripts directory." >&2
 fi
 

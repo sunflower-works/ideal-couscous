@@ -51,6 +51,8 @@ define ensure_venv
 endef
 
 .PHONY: env coco-download calib-subset bench consolidate report all dry-all clean-engines
+# New phony targets
+.PHONY += rpi-detector-macros wm-bench rpi-validate
 
 env:
 	@echo "[i] Setting up venv in $(EDGE_ROOT)"
@@ -108,26 +110,57 @@ consolidate:
 report: consolidate
 	@echo "[i] Report artefacts generated under $(EDGE_ROOT)/results/figures"
 
-clean-engines:
-	@echo "[i] Nothing to clean for ORT (no TensorRT engines). Removing previous latency files."
-	$(AT)$(RUN)rm -f $(EDGE_ROOT)/detector_latency_rpi5_*_*.json || true
-	$(AT)$(RUN)rm -f $(EDGE_ROOT)/latency_comparative_*.csv || true
+# Update detector latency macro for RPi in the LaTeX repo (\detInferMeanMsPi)
+rpi-detector-macros:
+	@$(call ensure_venv)
+	@echo "[i] Updating RPi detector macro in toolset/metrics_macros.tex"
+	$(AT)$(RUN)cd $(EDGE_ROOT)
+	$(AT)$(RUN)$(PY) $(SCRIPTS_DIR)/generate_detector_macros.py \
+		--csv latency_comparative_$(IMG_SIZE).csv --imgsz $(IMG_SIZE) --device rpi5 \
+		--out-tex $(PROJECT_ROOT)/toolset/figures/detector_latency_generated_rpi5.tex \
+		--out-macros $(PROJECT_ROOT)/toolset/metrics_macros.tex
 
-# Copy consolidated artifacts into the repo for convenience
-.PHONY: sync-results
-sync-results:
-	@echo "[i] Syncing artifacts into repo: $(PROJECT_RESULTS)"
-	$(AT)$(RUN)mkdir -p $(PROJECT_RESULTS)
-	$(AT)$(RUN)cp -f $(EDGE_ROOT)/results/figures/*.tex $(PROJECT_RESULTS) 2>/dev/null || true
-	$(AT)$(RUN)cp -f $(EDGE_ROOT)/results/figures/*.json $(PROJECT_RESULTS) 2>/dev/null || true
-	$(AT)$(RUN)cp -f $(EDGE_ROOT)/latency_comparative_*.csv $(PROJECT_RESULTS) 2>/dev/null || true
+# Watermarking benchmark (platform-agnostic) to produce toolset/pi_suite CSVs
+WM_ALGS ?= dct_parity,dwt_svd
+WM_RUN_TAG ?= coco2017_real_rpi
+WM_TRAIN_N ?= 400
+WM_VAL_N ?= 100
+WM_CHUNK ?= 200
+WM_PAYLOAD ?= 192
+wm-bench:
+	@$(call ensure_venv)
+	@echo "[i] Running watermarking benchmark (algorithms=$(WM_ALGS)) using COCO at $(COCO_ROOT)"
+	@for subset in train2017 val2017; do \
+		if [ ! -d "$(COCO_ROOT)/$$subset" ]; then echo "[e] Missing COCO subset: $(COCO_ROOT)/$$subset"; exit 2; fi; \
+	done
+	$(AT)$(RUN)cd $(PROJECT_ROOT)
+	$(AT)$(RUN)$(PY) scripts/coco_to_benchmark.py \
+		--coco-root $(COCO_ROOT) \
+		--subsets train2017 val2017 \
+		--train-count $(WM_TRAIN_N) --val-count $(WM_VAL_N) \
+		--chunk-size $(WM_CHUNK) \
+		--algorithms $(WM_ALGS) \
+		--run-tag $(WM_RUN_TAG) \
+		--git-commit $$((git --no-pager rev-parse --short HEAD) 2>/dev/null || echo deadbeef) \
+		--payload-bits $(WM_PAYLOAD) \
+		--embed-mode real \
+		--detector-mode fabricate \
+		--workers 1
+	@echo "[i] Watermark benchmark complete: toolset/pi_suite/$(WM_RUN_TAG)"
+
+# Full RPi pipeline wrapper (env -> data -> bench -> consolidate -> macros -> sync -> LaTeX analyze)
+rpi-validate: env coco-download calib-subset bench report rpi-detector-macros sync-results wm-bench
+	@echo "[i] Running LaTeX analyze/final to refresh macros/figures"
+	@$(MAKE) -C $(PROJECT_ROOT) analyze
+	@$(MAKE) -C $(PROJECT_ROOT) final || true
+	@echo "[i] RPi validation complete. PDF refreshed with generated metrics."
 
 # Convenience: dry run wrapper
 dry-all:
 	@$(MAKE) -f $(firstword $(MAKEFILE_LIST)) DRY_RUN=1 all
 
-all: env coco-download calib-subset bench report sync-results
-	@echo "[i] Full pipeline complete (RPi5/ORT)"
+all: rpi-validate
+	@echo "[i] Full pipeline complete (RPi5)"
 
 # Additional maintenance / reset targets
 

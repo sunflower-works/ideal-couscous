@@ -1,9 +1,34 @@
 .ONESHELL:  # All commands in a recipe run in the same shell
 SHELL := /bin/bash
 
+# ------------------------------------------------------------------------------
+# Jetson Edge Report Makefile (actionable pipeline)
+#
+# Usage:
+#   - make help                        # Show common targets and variables
+#   - make all                         # Full pipeline (env -> data -> calib -> batch -> report -> publish -> wm-bench)
+#   - make coco-download               # Download COCO subsets (uses writable COCO_ROOT automatically)
+#   - make calib-subset                # Prepare calibration images
+#   - make batch IMG_SIZE=640          # Run detector benchmarks (TensorRT) at size
+#   - make ov-cpu                      # Add OpenVINO CPU baseline row (OV)
+#   - make consolidate                 # Consolidate results for LaTeX
+#   - make publish-to-report           # Copy generated artifacts to LaTeX tree
+#   - make reset-edge | make full-clean# Maintenance / cleanup
+#
+# Key variables (override like VAR=value):
+#   EDGE_ROOT        Root work dir for engines/results (default: $(HOME)/edge-yolo)
+#   COCO_ROOT        Dataset root (auto-detected writable by default)
+#   COCO_SUBSETS     "val2017 annotations" (default) or include train2017
+#   IMG_SIZE         Inference image size (default 480)
+#   PRECISIONS       Space-separated list: "fp32 fp16 int8"
+#   CALIB_COUNT      Number of images for INT8 calibration (default 256)
+#   MAP              Evaluate mAP (1/0); MAP_DATA can be customized
+#   MODEL            Detector weights (default yolov8n.pt)
+# ------------------------------------------------------------------------------
+
 # Default variables
 EDGE_ROOT ?= $(HOME)/edge-yolo
-IMG_SIZE ?= 640
+IMG_SIZE ?= 480
 CALIB_COUNT ?= 256
 CALIB_SAMPLES ?= $(CALIB_COUNT)
 CALIB_SUBSETS ?= val2017
@@ -19,46 +44,122 @@ MODEL ?= yolov8n.pt
 
 # Writable COCO root detection
 COCO_CANDIDATES := $(HOME)/coco $(HOME)/data/coco /data/coco
-COCO_ROOT ?= $(shell for d in $(COCO_CANDIDATES); do mkdir -p $$d >/dev/null 2>&1 && test -w $$d && echo $$d && break; done)
-
+# Strict handling:
+# - If COCO_ROOT is provided by user (env/CLI), require it to be writable (error if not).
+# - If not provided, auto-select the first writable candidate and communicate the choice.
+ifeq ($(origin COCO_ROOT), undefined)
+COCO_ROOT := $(firstword $(shell for d in $(COCO_CANDIDATES); do mkdir -p $$d >/dev/null 2>&1 && test -w $$d && echo $$d; done))
 ifeq ($(strip $(COCO_ROOT)),)
-$(warning No writable COCO root found; set COCO_ROOT explicitly.)
-COCO_ROOT := $(HOME)/coco
+$(error No writable COCO_ROOT found. Set COCO_ROOT to a writable directory, e.g., 'COCO_ROOT=$(HOME)/coco')
+endif
+$(info [i] Using auto-selected COCO_ROOT: $(COCO_ROOT))
+else
+ifneq ($(shell mkdir -p $(COCO_ROOT) >/dev/null 2>&1 && test -w $(COCO_ROOT) && echo ok),ok)
+$(error Provided COCO_ROOT '$(COCO_ROOT)' is not writable. Choose a writable path, e.g., 'COCO_ROOT=$(HOME)/coco')
+endif
 endif
 
 VENV := $(EDGE_ROOT)/.venv
 PY := $(VENV)/bin/python
 ACTIVATE := source $(VENV)/bin/activate
 SCRIPTS_DIR := $(CURDIR)
+# New: Report root for publishing artifacts into the LaTeX tree
+REPORT_ROOT := $(abspath $(CURDIR)/..)
 
 # Helper to ensure venv python
 define ensure_venv
-	if [ ! -x $(PY) ]; then
-		echo "[i] Python venv missing; run 'make env' first"
-		exit 2
+	@if [ ! -x $(PY) ]; then \
+		echo "[i] Python venv missing; run 'make env' first"; \
+		exit 2; \
 	fi
 endef
 
-.PHONY: env coco-download calib-subset batch consolidate latency-table precision-diff report all clean-engines ov-cpu
+# Preflight: communicate requirements and validate paths before heavy work
+.PHONY: preflight
+preflight:
+	@echo "[i] Preflight checks"
+	@echo "[i] EDGE_ROOT: $(EDGE_ROOT)"
+	@mkdir -p "$(EDGE_ROOT)" >/dev/null 2>&1 || true
+	@if [ ! -w "$(EDGE_ROOT)" ]; then echo "[e] EDGE_ROOT is not writable: $(EDGE_ROOT)"; exit 2; fi
+	@echo "[i] COCO_ROOT: $(COCO_ROOT)"
+	@mkdir -p "$(COCO_ROOT)" >/dev/null 2>&1 || true
+	@if [ ! -w "$(COCO_ROOT)" ]; then echo "[e] COCO_ROOT is not writable: $(COCO_ROOT)"; exit 2; fi
+	@req=0; for s in $(COCO_SUBSETS); do \
+	  case "$$s" in \
+	    train2017) req=$$((req+18042884608));; \
+	    val2017) req=$$((req+778275200));; \
+	    annotations) req=$$((req+252907541));; \
+	  esac; \
+	done; \
+	rec=$$((req*2)); \
+	avail=$$(df -P -B1 "$(COCO_ROOT)" | awk 'NR==2{print $$4}'); \
+	echo "[i] COCO subsets: $(COCO_SUBSETS)"; \
+	echo "[i] Estimated download size (zip): $$req bytes; recommended free space (zip+extract): >= $$rec bytes"; \
+	echo "[i] Free space at $(COCO_ROOT): $$avail bytes"; \
+	if [ "$$avail" -lt "$$rec" ]; then echo "[w] Low disk space for COCO at $(COCO_ROOT). Consider changing COCO_ROOT or subsets."; fi
+
+# Phony targets (consolidated)
+.PHONY: preflight help print-config \
+	env coco-download calib-subset batch report consolidate latency-table precision-diff publish-to-report detector-macros \
+	ov-cpu clean-engines coco-extract reset-edge full-clean \
+	sys-tegrastats sys-ctrl-loop sys-ros2-qos sys-soak validate jetson-validate analyze-jetson all
+
+# Show common targets and variables
+help:
+	@echo "Jetson Edge Pipeline - common targets:"
+	@echo "  make all                 # Full pipeline (preflight -> env -> coco-download -> calib-subset -> batch -> report -> publish -> wm-bench)"
+	@echo "  make coco-download       # Download COCO (COCO_ROOT must be writable; see preflight)"
+	@echo "  make calib-subset        # Prepare INT8 calibration images (N=$(CALIB_COUNT))"
+	@echo "  make batch IMG_SIZE=640  # Run detector benchmarks (TensorRT) at size"
+	@echo "  make ov-cpu              # Add OpenVINO CPU baseline row (OV)"
+	@echo "  make consolidate         # Consolidate results for LaTeX"
+	@echo "  make publish-to-report   # Copy artifacts to LaTeX tree"
+	@echo "  make reset-edge          # Remove engines and artifacts (keep venv & dataset)"
+	@echo "  make full-clean          # Remove everything (optionally dataset with FULL_DATA=1)"
+	@echo ""
+	@echo "Key variables (override with VAR=value):"
+	@echo "  EDGE_ROOT=$(EDGE_ROOT)"
+	@echo "  COCO_ROOT=$(COCO_ROOT)"
+	@echo "  COCO_SUBSETS=$(COCO_SUBSETS)"
+	@echo "  IMG_SIZE=$(IMG_SIZE)"
+	@echo "  PRECISIONS=$(PRECISIONS)"
+	@echo "  CALIB_COUNT=$(CALIB_COUNT)"
+	@echo "  MODEL=$(MODEL)"
+
+# Print resolved configuration (useful for diagnostics)
+print-config:
+	@echo "[cfg] EDGE_ROOT=$(EDGE_ROOT)"
+	@echo "[cfg] COCO_ROOT=$(COCO_ROOT)"
+	@echo "[cfg] IMG_SIZE=$(IMG_SIZE)"
+	@echo "[cfg] PRECISIONS=$(PRECISIONS)"
+	@echo "[cfg] CALIB: count=$(CALIB_COUNT) samples=$(CALIB_SAMPLES) subsets=$(CALIB_SUBSETS) batch=$(CALIB_BATCH)"
+	@echo "[cfg] MAP=$(MAP) INT8_LAYER=$(INT8_LAYER)"
+	@echo "[cfg] MODEL=$(MODEL)"
 
 env:
 	echo "[i] Setting up edge venv in $(EDGE_ROOT)"
 	mkdir -p $(EDGE_ROOT)
 	cd $(EDGE_ROOT)
+	# If venv exists, skip heavy setup to keep runs fast and actionable
+	if [ -x "$(VENV)/bin/python" ]; then \
+		echo "[i] venv already exists at $(VENV); skipping environment setup"; \
+		exit 0; \
+	fi
 	set -e; python3 -m venv .venv --system-site-packages || { \
 		echo "[e] Python venv creation failed. On Ubuntu, install python3-venv (e.g., sudo apt install python3.10-venv)"; \
 		exit 2; \
 	}
-	$(ACTIVATE) && python -m pip install --upgrade pip wheel setuptools
+	# Upgrade packaging tools (quiet)
+	$(ACTIVATE) && python -m pip install --upgrade pip wheel setuptools --quiet
 	# Install core deps; try CUDA Python/PyCUDA for calibrator path (ignore failures)
-	$(ACTIVATE) && pip install ultralytics onnx onnxsim onnxruntime "numpy<2" opencv-python tqdm rich cuda-python || true
-	$(ACTIVATE) && pip install pycuda || true
+	$(ACTIVATE) && pip install --quiet ultralytics onnx onnxsim onnxruntime "numpy<2" opencv-python tqdm rich cuda-python || true
+	$(ACTIVATE) && pip install --quiet pycuda || true
 	echo "[i] venv ready"
 
 coco-download:
-	echo "[i] COCO root: $(COCO_ROOT)  subsets: $(COCO_SUBSETS) tol=$(COCO_SIZE_TOL)% allow_larger=$(COCO_ALLOW_LARGER)"
-	mkdir -p $(COCO_ROOT)
-	$(PY) $(SCRIPTS_DIR)/download_coco.py --output-dir $(COCO_ROOT) --subsets $(COCO_SUBSETS) \
+	@echo "[i] COCO root: $(COCO_ROOT)  subsets: $(COCO_SUBSETS) tol=$(COCO_SIZE_TOL)% allow_larger=$(COCO_ALLOW_LARGER)"
+	@mkdir -p "$(COCO_ROOT)"
+	@"$(PY)" "$(SCRIPTS_DIR)/download_coco.py" --output-dir "$(COCO_ROOT)" --subsets $(COCO_SUBSETS) \
 		--size-tolerance-pct $(COCO_SIZE_TOL) $(if $(filter 1,$(COCO_ALLOW_LARGER)),--allow-larger,) $(COCO_EXTRA)
 
 calib-subset:
@@ -72,10 +173,21 @@ batch:
 	$(call ensure_venv)
 	echo "[i] Batch precisions: $(PRECISIONS)  IMG_SIZE=$(IMG_SIZE)"
 	cd $(EDGE_ROOT)
+	# Ensure the aggregator used by the batch script exists in EDGE_ROOT
+	cp -f "$(SCRIPTS_DIR)/aggregate_latency.py" "$(EDGE_ROOT)/aggregate_latency.py"
 	PRECISION=fp32 true
 	MODEL="$(MODEL)" EXTRA_PRECS="$(PRECISIONS)" CALIB_DIR="$(EDGE_ROOT)/calib_images" CALIB_SAMPLES=$(CALIB_SAMPLES) \
 	INT8_LAYER_REPORT=$(INT8_LAYER) MAP_EVAL=$(MAP) MAP_DATA=coco128.yaml \
 	bash $(SCRIPTS_DIR)/11_jetson_batch_precisions.sh $(EDGE_ROOT) $(IMG_SIZE)
+	@$(MAKE) -C "$(SCRIPTS_DIR)" -f Makefile.jetson ov-cpu IMG_SIZE=$(IMG_SIZE) MODEL="$(MODEL)" EDGE_ROOT="$(EDGE_ROOT)"
+
+# Report: consolidate and generate table/precision diff artifacts in one go
+report:
+	$(call ensure_venv)
+	@echo "[i] Generating report artifacts (consolidate + table + precision diff)"
+	@$(MAKE) consolidate
+	@$(MAKE) latency-table
+	@$(MAKE) precision-diff || true
 
 consolidate:
 	$(call ensure_venv)
@@ -111,8 +223,107 @@ precision-diff:
 		--out-tex results/figures/precision_diff_summary.tex \
 		--out-json results/figures/precision_diff_summary.json || true
 
-report: consolidate latency-table precision-diff
-	echo "[i] Report artefacts generated under $(EDGE_ROOT)/results/figures"
+# Watermarking benchmark on Jetson (real embed/extract on COCO samples)
+# Produces toolset/pi_suite/<run_tag>/* CSVs consumed by unified_analysis.py
+WM_ALGS ?= dct_qim,dwt_qim
+WM_RUN_TAG ?= coco2017_real_jetson
+WM_TRAIN_N ?= 800
+WM_VAL_N ?= 200
+WM_CHUNK ?= 200
+WM_PAYLOAD ?= 192
+wm-bench:
+	$(call ensure_venv)
+	@echo "[i] Running watermarking benchmark (algorithms=$(WM_ALGS)) on COCO at $(COCO_ROOT)"
+	@MISS=""; for subset in train2017 val2017; do \
+		if [ ! -d "$(COCO_ROOT)/$$subset" ]; then MISS="$$MISS $$subset"; fi; \
+	done; \
+	if [ -n "$$MISS" ]; then \
+		PRESENT=""; for s in train2017 val2017 annotations; do [ -d "$(COCO_ROOT)/$$s" ] && PRESENT="$$PRESENT $$s"; done; \
+		echo "[e] COCO subset(s) missing under $(COCO_ROOT):$$MISS"; \
+		echo "[i] Present subsets:$$PRESENT"; \
+		echo "[i] To download required subsets, run:"; \
+		echo "    make -C \"$(SCRIPTS_DIR)\" -f Makefile.jetson coco-download COCO_SUBSETS='train2017 val2017 annotations'"; \
+		exit 2; \
+	fi
+	cd $(REPORT_ROOT)
+	# Hotfix: ensure unterminated default string for --detector-mode is corrected (older script versions)
+	@sed -i -E 's/default="fabricate[[:space:]]*$$/default="fabricate",/' scripts/coco_to_benchmark.py || true
+	$(PY) scripts/coco_to_benchmark.py \
+		--coco-root $(COCO_ROOT) \
+		--subsets train2017 val2017 \
+		--train-count $(WM_TRAIN_N) --val-count $(WM_VAL_N) \
+		--chunk-size $(WM_CHUNK) \
+		--algorithms $(WM_ALGS) \
+		--run-tag $(WM_RUN_TAG) \
+		--git-commit $$(git --no-pager rev-parse --short HEAD || echo deadbeef) \
+		--payload-bits $(WM_PAYLOAD) \
+		--embed-mode real \
+		--detector-mode fabricate \
+		--workers 1 && \
+		echo "[i] Watermark benchmark complete: toolset/pi_suite/$(WM_RUN_TAG)" || { \
+			echo "[e] Watermark benchmark failed (see logs above)"; exit 2; \
+		}
+
+# Publish/copy generated report artifacts into the LaTeX repo structure
+publish-to-report:
+	@echo "[i] Publishing artifacts to LaTeX repo at $(REPORT_ROOT)"
+	@mkdir -p $(REPORT_ROOT)/results/figures $(REPORT_ROOT)/toolset/figures || true
+	# Edge inference reports (Jetson)
+	@if [ -f "$(EDGE_ROOT)/results/figures/edge_inference_report_jetson_$(IMG_SIZE).tex" ]; then \
+		cp -f "$(EDGE_ROOT)/results/figures/edge_inference_report_jetson_$(IMG_SIZE).tex" "$(REPORT_ROOT)/results/figures/edge_inference_report_jetson_$(IMG_SIZE).tex"; \
+		cp -f "$(EDGE_ROOT)/results/figures/edge_inference_report_jetson_$(IMG_SIZE).tex" "$(REPORT_ROOT)/results/figures/edge_inference_report_jetson.tex"; \
+	fi
+	# Precision diff summary (optional)
+	@if [ -f "$(EDGE_ROOT)/results/figures/precision_diff_summary.tex" ]; then \
+		cp -f "$(EDGE_ROOT)/results/figures/precision_diff_summary.tex" "$(REPORT_ROOT)/results/figures/precision_diff_summary.tex"; \
+	fi
+	@echo "[i] Published Jetson artifacts."
+
+# Generate detector macros (placeholder; can be extended later)
+detector-macros:
+	@echo "[i] Skipping detector macros (no-op)"
+
+# ---------------- System-level validation (Jetson) ----------------
+.PHONY: sys-tegrastats sys-ctrl-loop sys-ros2-qos sys-soak validate
+
+LOGS_DIR := $(REPORT_ROOT)/logs
+
+sys-tegrastats:
+	@echo "[i] tegrastats logging (120s) -> $(LOGS_DIR)/tegrastats.csv"
+	@mkdir -p $(LOGS_DIR)
+	@cd $(REPORT_ROOT) && python3 scripts/tegrastats_logger.py --out $(LOGS_DIR)/tegrastats.csv --interval-ms 1000 --duration-sec 120
+
+sys-ctrl-loop:
+	@echo "[i] control-loop stability 50Hz (90s) -> $(LOGS_DIR)/ctrl_loop_50hz.csv"
+	@mkdir -p $(LOGS_DIR)
+	@cd $(REPORT_ROOT) && python3 scripts/control_loop_stability.py --hz 50 --duration-sec 90 --out $(LOGS_DIR)/ctrl_loop_50hz.csv --busywork 0.002
+
+sys-ros2-qos:
+	@echo "[i] ROS2 QoS probe (UDP fallback if rclpy missing) 50Hz (60s) -> $(LOGS_DIR)/ros2_qos.csv"
+	@mkdir -p $(LOGS_DIR)
+	@cd $(REPORT_ROOT) && python3 scripts/ros2_qos_probe.py --mode ros2 --hz 50 --size 1024 --duration-sec 60 --out $(LOGS_DIR)/ros2_qos.csv || \
+		(cd $(REPORT_ROOT) && python3 scripts/ros2_qos_probe.py --mode udp --hz 50 --size 1024 --duration-sec 60 --out $(LOGS_DIR)/ros2_qos.csv)
+
+sys-soak:
+	@echo "[i] Soak runner (10 min) -> $(REPORT_ROOT)/logs/soak"
+	@cd $(REPORT_ROOT) && python3 scripts/soak_runner.py --duration-sec 600 --out-dir logs/soak --imgsz $(IMG_SIZE) --trt-root $(EDGE_ROOT) || true
+
+# Full validation bundle (system-level + perception + watermark + LaTeX refresh)
+validate: jetson-validate sys-tegrastats sys-ctrl-loop sys-ros2-qos sys-soak
+	@echo "[i] Bundling validation artifacts"
+	@cd $(REPORT_ROOT) && python3 scripts/artifact_bundler.py --out results/validation_bundle.tar.gz --logs-dir logs --figs-dir results/figures --toolset-dir toolset
+	@echo "[i] Validation bundle at $(REPORT_ROOT)/results/validation_bundle.tar.gz"
+
+# Convenience: full Jetson validation pipeline + publish + watermark + analyze
+jetson-validate: preflight env coco-download calib-subset batch report detector-macros publish-to-report wm-bench
+	@echo "[i] Running LaTeX analysis to generate macros/figures from watermark CSVs"
+	@$(MAKE) -C $(REPORT_ROOT) analyze
+	@$(MAKE) -C $(REPORT_ROOT) final || true
+	@echo "[i] Jetson validation complete. PDF refreshed with generated metrics."
+
+# Make `all` run the full Jetson pipeline for parity with RPi
+all: jetson-validate
+	@echo "[i] Full pipeline complete (Jetson)"
 
 # Optional: OpenVINO CPU benchmark (requires openvino pip)
 ov-cpu:
@@ -120,13 +331,13 @@ ov-cpu:
 	cd $(EDGE_ROOT)
 	$(PY) -m pip install --quiet --disable-pip-version-check openvino || true
 	# Ensure ONNX exists (export minimal 320 by default if missing)
-	STEM=$$(basename "$(MODEL)"); STEM=$${STEM%.*}; \
+	@STEM=$$(basename "$(MODEL)"); STEM=$${STEM%.*}; \
 	if [ ! -f $$STEM_$(IMG_SIZE).onnx ]; then \
 		$(PY) $(SCRIPTS_DIR)/export_model.py --model $(MODEL) --imgsz $(IMG_SIZE) --out $$STEM_$(IMG_SIZE).onnx --dynamic false || exit 1; \
 	fi
 	# Run OpenVINO CPU benchmark
 	$(PY) $(SCRIPTS_DIR)/bench_yolov8.py --backend ov --onnx $$STEM_$(IMG_SIZE).onnx --imgsz $(IMG_SIZE) --model-name $$STEM \
-		--warmup 30 --iters 300 --out detector_latency_jetson_$(IMG_SIZE)_ovcpu.json
+		--warmup 30 --iters 300 --out detector_latency_jetson_$(IMG_SIZE)_ov_cpu.json
 	# Aggregate (append row)
 	$(PY) $(SCRIPTS_DIR)/aggregate_latency.py --glob "detector_latency_jetson_$(IMG_SIZE)_*.json" --out latency_comparative_$(IMG_SIZE).csv || true
 
@@ -170,6 +381,3 @@ full-clean:
 	@echo "[i] Full clean complete"
 
 .PHONY += coco-extract reset-edge full-clean
-
-all: env coco-download calib-subset batch report
-	echo "[i] Full pipeline complete"
