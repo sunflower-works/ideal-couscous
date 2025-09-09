@@ -33,6 +33,7 @@ OUTPUT="poster.pdf"
 
 usage() {
   sed -n '1,/^set -euo/p' "$0" | sed 's/^# \{0,1\}//'
+  # shellcheck disable=SC2028
   echo "\nOptions:\n  --scale N         Poster: scale factor (e.g. 2, 3.5). Overrides --size/POSTER_SIZE.\n  --size Ax         Poster: target poster size (A0..A4 etc). Ignored if --scale given.\n  -m MEDIA          Poster: base media sheet size (default ${BASE_MEDIA}).\n  --mosaic          Mosaic mode: tile all pages on one sheet.\n  --grid CxR        Mosaic grid override (e.g. 8x8). Auto if omitted.\n  --paper PAPER     Mosaic paper (default ${MOSAIC_PAPER}).\n  --frame           Mosaic: draw thin frames around tiles.\n  -o FILE           Output PDF filename (default poster.pdf).\n  -h                Show this help.\n"
 }
 

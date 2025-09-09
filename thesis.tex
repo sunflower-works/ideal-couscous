@@ -93,10 +93,12 @@ python self_verify.py --input thesis.pdf
 \end{minted}
 
     \paragraph{Notes.}
-    The repository pins versions in the requirements file; do not switch to ``latest'' when reproducing results. If the tag is signed, the \texttt{git tag -v} step will report the signer identity; otherwise skip it.
+    The repository pins versions in the requirements file; do not switch to ``latest'' when reproducing results.
+    If the tag is signed, the \texttt{git tag -v} step will report the signer identity; otherwise skip it.
 
     \section*{Offline verify (no network)}
-    This thesis ships with the same verification script in the artefacts bundle. If you cannot access GitHub/Zenodo, use:
+    This thesis ships with the same verification script in the artefacts bundle.
+    If you cannot access GitHub/Zenodo, use:
 \begin{minted}[fontsize=\small]{bash}
 python self_verify.py --input thesis.pdf
 \end{minted}

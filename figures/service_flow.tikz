@@ -1,70 +1,50 @@
-% Detailed end-to-end service flow architecture diagram
 \begin{tikzpicture}[
-  font=\small,
-  node distance=8mm and 12mm,
-  box/.style={draw,rounded corners,fill=black!2,minimum width=38mm,inner sep=6pt,align=center},
-  circ/.style={draw,circle,minimum width=30mm,inner sep=6pt,fill=white,align=center},
-  link/.style={-latex,thick},
-  optlink/.style={link,dashed},
-  label/.style={font=\scriptsize,fill=gray!20,inner sep=1pt},
+    font=\footnotesize,
+    node distance=8mm and 28mm,
+    % Tier boxes
+    basebox/.style={draw,rounded corners,minimum width=36mm,minimum height=22mm,align=left,inner sep=4pt},
+    colR/.style={basebox,fill=green!6,draw=green!45!black},
+    colG/.style={basebox,fill=cyan!7, draw=cyan!45!black},
+    colH/.style={basebox,fill=violet!6,draw=violet!45!black},
+    title/.style={font=\bfseries,align=center,minimum width=36mm,inner sep=2pt},
+    % Flows
+    flowUp/.style={-{Latex[length=3.2mm,width=2.2mm]},line width=0.95pt,draw=blue!65!black},
+    flowDn/.style={-{Latex[length=3.2mm,width=2.2mm]},line width=0.95pt,draw=orange!85!black},
+    % Labels
+    lblUp/.style={font=\scriptsize,inner sep=2pt,rounded corners,draw=blue!35!black,fill=blue!6},
+    lblDn/.style={font=\scriptsize,inner sep=2pt,rounded corners,draw=orange!55!black,fill=orange!10}
 ]
+% Column 1 — Rover
+    \node[title] (rTitle) {Rover (Pi 5)};
+    \node[colR,below=1mm of rTitle] (rBox) {• 50 Hz control\\• IMU fusion\\• MQTT telemetry};
 
-% ----- LAN / VPN block ------------------------------------------------
-\node[box,minimum height=80mm](lan){IP / Wi-Fi / Ethernet};
-  \node[circ,above right=of lan.north west,xshift=18mm,yshift=-16mm]         (home){Home Pi\\Central Server};
-  \node[circ,below=22mm of home]                                             (cmd){Portable Pi\\Command Center};
+% Column 2 — Gateway
+    \node[title,right=28mm of rTitle] (gTitle) {Gateway (Jetson)};
+    \node[colG,below=1mm of gTitle] (gBox) {• YOLOv8 detection\\• MQTT broker\\• Storage proxy};
 
-  \path[link] (cmd) edge node[label]{\gls{vpn} / SSH} (home);
+% Column 3 — Home HQ
+    \node[title,right=28mm of gTitle] (hTitle) {Home HQ};
+    \node[colH,below=1mm of hTitle] (hBox) {• TimescaleDB\\• Grafana\\• Alert manager};
 
-% ----- WireGuard pair -------------------------------------------------
-\node[circ,fill=orange!20,right=28mm of cmd] (wgSrv){WireGuard Srv\\10.81.66.1};
-\node[circ,fill=orange!20,below=of wgSrv]    (wgCli){WireGuard Cli\\10.81.66.7};
-\path[link] (wgSrv) edge node[label]{WireGuard tunnel} (wgCli);
+% Upstream flows (blue)
+    \path[flowUp] (rBox.east) -- node[lblUp,above]{LoRa / MQTT} (gBox.west);
+    \path[flowUp] (gBox.east) -- node[lblUp,above]{WireGuard} (hBox.west);
 
-\path[link] (cmd) edge[out=0,in=180] node[label]{\gls{mqtt} cmd/rover/} (wgCli);
-\path[link] (cmd) edge[bend right=10] node[label]{\gls{mqtt} alert/rover/} (wgSrv);
+% Downstream command path (orange; single label)
+    \path[flowDn] (hBox.west |- hBox.south) to[bend right=16]
+                  node[lblDn,below]{Commands (QoS 2)} (gBox.east |- gBox.south);
+    \path[flowDn] (gBox.west |- gBox.south) to[bend right=16] (rBox.east |- rBox.south);
 
-% ----- Mobile field centre block -------------------------------------
-\node[box,below=8mm of wgCli,minimum width=55mm,minimum height=45mm] (mob) {MOBILE\\ Command Center};
-  \node[box,fill=white,above=2mm of mob] (laptop)
-        {OpenSUSE Laptop “Pluton”\\[-1pt]• mqtt Edge Relay\\• Dashboard UI\\• Log Capture};
-  \node[box,fill=white,below=2mm of mob] (piZero)
-        {Pi Zero 2 W “$n$-node”\\LoRa HAT};
-
-\path[link] (wgCli) edge node[label]{\gls{mqtt} telemetry/rover/} (mob);
-\path[link] (piZero) edge node[label]{UDP telemetry} (mob);
-\path[link] (piZero) edge[bend left=10] node[label]{UDP 7E \& pkt} (laptop);
-\path[link] (laptop) edge node[label]{USB-ECM 192.168.13.x} (mob);
-
-% ----- LoRa base-station stack ---------------------------------------
-\node[box,below=of mob,minimum height=55mm] (loraBase){LoRa 868 MHz};
-  \node[box,fill=white,above=0 of loraBase] (ttgoUSB){TTGO LoRa32\\USB-UART};
-  \node[box,fill=white,below=0 of loraBase] (ttgoSPI){TTGO LoRa32\\SPI/UART};
-  \path[link] (ttgoUSB) -- (ttgoSPI);
-  \node[label,above left=-1mm of loraBase.north] {USB};
-
-% optional extra antenna
-\node[box,fill=white,right=18mm of loraBase] (roof){TTGO LoRa32\\Roof Antenna};
-\path[optlink] (roof.west) edge[bend left=10] (loraBase);
-
-% ----- Rover block ----------------------------------------------------
-\node[box,left=28mm of loraBase,minimum height=55mm] (rover){Pi Rover};
-  \node[circ,fill=white] at (rover) {Rover Pi};
-\path[link] (rover.east) edge node[label]{UART/SPI} (loraBase.west);
-
-% camera → Pi → Jetson stack
-\node[box,above left=of cmd,xshift=-10mm] (jetson)
-    {Jetson Orin Nano\\• YOLO-v8 Detect\\• Watermark + Sign\\• Publishes alerts → mqtt};
-\path[link] (jetson) edge[bend left=12] (cmd);
-\node[label,midway,sloped,above] at ($(jetson)!0.55!(cmd)$) {\gls{mqtt} alert/rover/};
-
-\node[box,below=14mm of jetson](pi5)
-    {Raspberry Pi 5\\• H.265 Encode\\• RTSP Src};
-\node[label,below=1mm of pi5] (piLab) {RTSP (720p)};
-\path[link] (pi5.south) edge[bend right=20] (cmd.west);
-
-% CSI camera icon
-\node[box,above=of pi5](cam){CSI Camera};
-\path[link] (cam) -- (pi5);
-
-\end{tikzpicture}
+% Compact legend with colored rules, centered below the diagram
+    \node[anchor=north] at ($(rBox.south)!0.5!(hBox.south) + (0,-9mm)$) {%
+        \scriptsize
+        \setlength{\tabcolsep}{5pt}%
+        \begin{tabular}{@{}ll@{}}
+        \toprule
+        Symbol & Meaning \\ \midrule
+        {\color{blue!65!black}\rule{12pt}{2pt}} & Upstream (telemetry, alerts) \\
+        {\color{orange!85!black}\rule{12pt}{2pt}} & Downstream (commands; QoS 2, ACK ≤ 250 ms) \\
+        \bottomrule
+        \end{tabular}
+    };
+\end{tikzpicture}%
